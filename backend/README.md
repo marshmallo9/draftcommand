@@ -2,14 +2,24 @@
 
 Backend for the Draft Research Lab frontend: analyst/podcast insights (player
 quotes, opinions, breakout/risk calls), and a real player pool synced from
-Sleeper + nflverse.
+Sleeper, nflverse, and FantasyPros.
 
 Insights are still hand-curated placeholder quotes (light build — no audio
-transcription yet). Player sync is real and live: Sleeper for the player
-pool/position/team/injury status, nflverse for season stats. Both are shaped
-so more sources (FantasyPros ECR, real podcast transcription) drop in later
-without changing the frontend contract — see
+transcription yet, that's Phase 3). Player sync is real and live: Sleeper
+for the player pool/position/team/injury status, nflverse for season stats
+and bye weeks, FantasyPros for a real expert-consensus rank. All shaped so
+what's still open (real podcast transcription) drops in later without
+changing the frontend contract — see
 [`docs/DATA_SOURCES.md`](../docs/DATA_SOURCES.md).
+
+**FantasyPros requires an API key** (`FANTASYPROS_API_KEY` in `.env` — see
+`.env.example`). It's a free key for personal/non-commercial use with a real
+daily quota FantasyPros doesn't publish (check your own dashboard). The sync
+gates every FantasyPros call behind a cooldown for exactly this reason — see
+`docs/DATA_SOURCES.md`'s FantasyPros section before changing
+`FANTASYPROS_SYNC_COOLDOWN_HOURS` or calling `npm run sync:force`. **Never
+commit a real key** — `.env` is gitignored; on a real host it goes in that
+host's environment variable settings, not a file in this repo.
 
 ## Stack
 
@@ -95,25 +105,30 @@ Query params (all optional, combinable): `position` (exact, e.g. `RB`), `team`
     "status": "Active",
     "injury_status": null,
     "search_rank": 5,
+    "ecr_rank": 2,
+    "ecr_tier": 1,
     "bye_week": 10,
     "synced_at": "2026-08-30T19:59:17.502Z",
-    "stats": { "yds": 1780, "td": 17, "raw": { "...": "whatever nflverse's row actually had" } }
+    "stats": { "yds": 1780, "td": 17, "raw": { "...": "whatever nflverse's row actually had" } },
+    "rank": 2
   }
 ]
 ```
 
+`rank` is `ecr_rank ?? search_rank` — FantasyPros' real expert-consensus
+rank when we have it, Sleeper's popularity-based ordering as the fallback
+for anyone FantasyPros doesn't cover. Everything downstream should read
+`rank`, not `ecr_rank`/`search_rank` directly.
+
 `bye_week` is `null` until that player's team has been matched against a
 synced schedule — see `src/sync/index.js#computeByeWeeks`.
 
-`search_rank` is Sleeper's popularity-based ordering, not an expert
-consensus rank — see `docs/DATA_SOURCES.md` for the plan to replace it with
-FantasyPros ECR.
-
 ### `POST /api/sync/players`
 
-Pulls fresh data from Sleeper and nflverse and upserts into the `players`
-table (see `src/sync/`). Idempotent — safe to call repeatedly. Always
-responds `200` with a per-source result, even if every source failed:
+Pulls fresh data from Sleeper, nflverse, and (subject to its own cooldown)
+FantasyPros, and upserts into the `players` table (see `src/sync/`).
+Idempotent — safe to call repeatedly. Always responds `200` with a
+per-source result, even if every source failed:
 
 ```json
 {
@@ -121,21 +136,29 @@ responds `200` with a per-source result, even if every source failed:
   "nflverseStats": { "ok": true, "total": 4102, "matched": 2390 },
   "nflverseInjuries": { "ok": true, "total": 88, "matched": 12 },
   "nflverseSchedules": { "ok": true, "teamsResolved": 32, "playersUpdated": 2841 },
+  "fantasyPros": { "ok": true, "total": 400, "matched": 380 },
   "playersInDb": 2841
 }
 ```
+
+If the FantasyPros cooldown hasn't elapsed, that entry looks like
+`{ "ok": true, "skipped": true, "reason": "..." }` instead — still `ok`,
+just didn't spend quota. Pass `?force=true` to bypass the cooldown
+deliberately (`npm run sync:force` from the CLI).
 
 No auth on this MVP endpoint. Either protect it before it's public-facing,
 or only ever call it from a scheduled job (`npm run sync` /
 `scripts/sync-players.js`) rather than exposing the route.
 
-**This has not been exercised against the live Sleeper/nflverse APIs** — it
-was built in a sandboxed session whose network policy blocks those hosts.
-The DB layer, upsert logic, and API responses were verified end-to-end with
-synthetic data standing in for a real sync; the actual HTTP calls haven't
-been. Run `npm run sync` once wherever this actually has internet access
-before trusting it — see `docs/DATA_SOURCES.md` for what a clean run looks
-like and how to debug a source that fails.
+**This has not been exercised against the live Sleeper/nflverse/FantasyPros
+APIs** — it was built in a sandboxed session whose network policy blocks
+those hosts. The DB layer, upsert logic, API responses, and (for
+FantasyPros specifically) the entire cooldown state machine were verified
+end-to-end with synthetic data and real timestamps standing in for a real
+sync; the actual HTTP calls haven't been. Run `npm run sync` once wherever
+this actually has internet access before trusting it — see
+`docs/DATA_SOURCES.md` for what a clean run looks like and how to debug a
+source that fails.
 
 ## Frontend integration
 

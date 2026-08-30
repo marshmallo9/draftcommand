@@ -345,7 +345,7 @@ tr:hover td{background:var(--ink-800);}
           <span class="substat" id="playerSyncStatus"></span>
           <span class="substat" style="margin-left:auto;">Last synced: <b id="lastSynced">—</b></span>
         </div>
-        <p class="subtext" style="margin-top:-4px;">"Sync Players from API" pulls the live player pool (position, team, injury status) from Sleeper and season stats from nflverse via the same backend as the Analyst Feed — no copy/paste. Rank is Sleeper's <code>search_rank</code>, a popularity-based proxy, not an expert consensus rank; that's the next thing to swap in once a FantasyPros key exists (see <code>docs/DATA_SOURCES.md</code>).</p>
+        <p class="subtext" style="margin-top:-4px;">"Sync Players from API" pulls the live player pool (position, team, injury status, bye week) from Sleeper + nflverse, and rank from FantasyPros' expert consensus (ECR) — via the same backend as the Analyst Feed, no copy/paste. Falls back to Sleeper's popularity-based <code>search_rank</code> for any player FantasyPros doesn't cover. See <code>docs/DATA_SOURCES.md</code>.</p>
         <textarea class="importbox" id="importBox" placeholder="Paste rows as: Name, Pos, Team, OverallRank, Bye (one player per line)
 Example:
 Ja'Marr Chase, WR, CIN, 4, 10
@@ -1040,15 +1040,17 @@ async function syncPlayersFromAPI(){
     synced.forEach(sp => {
       if(!sp.pos || !sp.name) return;
       const existing = state.players.find(p => p.name.toLowerCase() === sp.name.toLowerCase());
+      // sp.rank is FantasyPros' expert consensus rank when the backend has
+      // it, falling back to Sleeper's popularity-based search_rank.
       if(existing){
         existing.pos = sp.pos; existing.team = sp.team || existing.team;
-        if(sp.search_rank) existing.rank = sp.search_rank;
+        if(sp.rank) existing.rank = sp.rank;
         if(sp.bye_week) existing.bye = sp.bye_week;
         if(sp.stats){ existing.stats2025 = { yds: sp.stats.yds, td: sp.stats.td, type: existing.stats2025?.type || 'Rec' }; }
         updated++;
-      } else if(sp.search_rank) {
+      } else if(sp.rank) {
         state.players.push({
-          id:'p'+sp.sleeper_id, name:sp.name, pos:sp.pos, team:sp.team||'', rank:sp.search_rank, bye:sp.bye_week||0,
+          id:'p'+sp.sleeper_id, name:sp.name, pos:sp.pos, team:sp.team||'', rank:sp.rank, bye:sp.bye_week||0,
           stats2025: sp.stats ? { yds:sp.stats.yds, td:sp.stats.td, type:'Rec' } : { yds:0, td:0, type:'—' },
           schedule2026:'TBD (full weekly matchups aren\'t synced yet, only the bye week — see docs/DATA_SOURCES.md)',
           starred:false, drafted:false

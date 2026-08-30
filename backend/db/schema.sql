@@ -35,8 +35,11 @@ CREATE TABLE IF NOT EXISTS players (
   status TEXT,                  -- Sleeper roster status, e.g. "Active", "Inactive"
   injury_status TEXT,           -- e.g. "Questionable", "Out", "IR" — null if healthy
   search_rank INTEGER,          -- Sleeper's search_rank: a popularity-based proxy for ADP,
-                                 -- NOT an expert consensus rank. Swap for FantasyPros ECR
-                                 -- once that API key exists (see docs/DATA_SOURCES.md).
+                                 -- NOT an expert consensus rank. Used as the rank fallback for
+                                 -- any player ecr_rank doesn't cover.
+  ecr_rank INTEGER,             -- FantasyPros expert consensus rank (real draft rank, aggregated
+                                 -- across 100+ analysts) — the primary rank once present.
+  ecr_tier INTEGER,             -- FantasyPros tier for this player, if the API returned one.
   bye_week INTEGER,             -- derived from nflverse's schedules release (the one week a
                                  -- team appears in no game); null until that team's schedule
                                  -- has been matched, or if the gap couldn't be determined cleanly
@@ -48,3 +51,12 @@ CREATE TABLE IF NOT EXISTS players (
 
 CREATE INDEX IF NOT EXISTS idx_players_pos ON players(pos);
 CREATE INDEX IF NOT EXISTS idx_players_normalized_name ON players(normalized_name);
+
+-- Small key/value store for sync bookkeeping — currently just the
+-- FantasyPros cooldown timestamp (see src/sync/fantasypros.js). A real
+-- table instead of a file so it survives the same way the rest of the
+-- synced data does.
+CREATE TABLE IF NOT EXISTS sync_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);

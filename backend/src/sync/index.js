@@ -1,9 +1,30 @@
 const { run, get, all } = require('../db');
 const { fetchSleeperPlayers } = require('./sleeper');
 const { fetchPlayerStats, fetchInjuries, fetchSchedules } = require('./nflverse');
+const { fetchConsensusRankings } = require('./fantasypros');
 const { normalizeName } = require('./normalize');
 
 const CURRENT_SEASON = new Date().getFullYear();
+
+// FantasyPros' free tier has a real daily quota we don't know the exact
+// number for (it's shown in the user's own dashboard, not the public docs).
+// Default to one real call per ~day regardless — "week to week" insights
+// were never a per-minute need — and make it configurable via env for
+// whoever actually has the quota number in front of them.
+const FANTASYPROS_COOLDOWN_HOURS = Number(process.env.FANTASYPROS_SYNC_COOLDOWN_HOURS) || 20;
+const FANTASYPROS_SCORING = process.env.FANTASYPROS_SCORING || 'PPR';
+
+async function getSyncMeta(key) {
+  const row = await get('SELECT value FROM sync_meta WHERE key = ?', [key]);
+  return row ? row.value : null;
+}
+async function setSyncMeta(key, value) {
+  await run(
+    `INSERT INTO sync_meta (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [key, value]
+  );
+}
 
 // Best-effort pull of {yards, touchdowns} out of whatever columns an
 // nflverse player_stats row actually has this season — column names have
@@ -113,9 +134,44 @@ async function syncNflverseSchedules() {
   return { teamsResolved: Object.keys(byeByTeam).length, playersUpdated };
 }
 
+// One call, all positions at once (see fetchConsensusRankings), gated by a
+// cooldown so a quota-limited key doesn't get burned by an accidental
+// double-trigger of the sync button or a too-frequent cron schedule. Pass
+// { force: true } to bypass the cooldown deliberately.
+async function syncFantasyPros({ force = false } = {}) {
+  const lastSyncedAt = await getSyncMeta('fantasypros_last_synced_at');
+  if (!force && lastSyncedAt) {
+    const hoursSince = (Date.now() - new Date(lastSyncedAt).getTime()) / 3600000;
+    if (hoursSince < FANTASYPROS_COOLDOWN_HOURS) {
+      return {
+        skipped: true,
+        reason: `cooldown active — last synced ${hoursSince.toFixed(1)}h ago, waiting until ${FANTASYPROS_COOLDOWN_HOURS}h (set FANTASYPROS_SYNC_COOLDOWN_HOURS to change, or pass force:true)`,
+      };
+    }
+  }
+
+  const rows = await fetchConsensusRankings({ season: CURRENT_SEASON, position: 'ALL', scoring: FANTASYPROS_SCORING });
+  let matched = 0;
+  for (const row of rows) {
+    const rawName = row.player_name;
+    if (!rawName) continue;
+    const rankValue = row.rank_ecr ?? row.rank_ave ?? row.rank;
+    if (rankValue == null) continue;
+    const norm = normalizeName(rawName);
+    const res = await run(
+      'UPDATE players SET ecr_rank = ?, ecr_tier = ? WHERE normalized_name = ?',
+      [Math.round(Number(rankValue)), row.tier ?? null, norm]
+    );
+    matched += res.changes;
+  }
+
+  await setSyncMeta('fantasypros_last_synced_at', new Date().toISOString());
+  return { skipped: false, total: rows.length, matched };
+}
+
 // Runs every source independently — one failing (bad tag, network blip,
 // nflverse renamed a file) never blocks the others or crashes the caller.
-async function runSync() {
+async function runSync(opts = {}) {
   const result = { startedAt: new Date().toISOString() };
 
   try {
@@ -146,10 +202,19 @@ async function runSync() {
     result.nflverseSchedules = { ok: false, error: err.message };
   }
 
+  try {
+    const r = await syncFantasyPros({ force: opts.forceFantasyPros });
+    result.fantasyPros = r.skipped
+      ? { ok: true, skipped: true, reason: r.reason }
+      : { ok: true, total: r.total, matched: r.matched };
+  } catch (err) {
+    result.fantasyPros = { ok: false, error: err.message };
+  }
+
   const row = await get('SELECT COUNT(*) AS count FROM players');
   result.playersInDb = row.count;
   result.finishedAt = new Date().toISOString();
   return result;
 }
 
-module.exports = { runSync, summarizeStatsRow, computeByeWeeks, CURRENT_SEASON };
+module.exports = { runSync, summarizeStatsRow, computeByeWeeks, CURRENT_SEASON, FANTASYPROS_COOLDOWN_HOURS };

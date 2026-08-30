@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "sync": "node scripts/sync-players.js"
+    "sync": "node scripts/sync-players.js",
+    "sync:force": "node scripts/sync-players.js --force"
   },
   "license": "MIT",
   "dependencies": {

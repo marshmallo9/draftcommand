@@ -16,9 +16,9 @@ Analyst insights served from `backend/` (Express + SQLite), seeded with
 hand-picked placeholder quotes. See `backend/README.md`. The Analyst Feed tab
 already talks to this over `GET /api/insights`.
 
-## Phase 2 — real rankings, ADP, stats & injuries (Sleeper + nflverse: built; FantasyPros: not yet)
+## Phase 2 — real rankings, ADP, stats, injuries & bye weeks — built
 
-The Sleeper and nflverse pieces of this are implemented — `backend/src/sync/`,
+Sleeper, nflverse, and FantasyPros are all implemented — `backend/src/sync/`,
 a `players` table, `GET /api/players`, `POST /api/sync/players`, and a
 "Sync Players from API" button on the Setup tab that merges the result into
 `state.players` the same way pasted rows already merge. What that gets you
@@ -29,9 +29,10 @@ today:
   takes precedence over the hardcoded `SIGNAL_TAGS` seed data)
 - Season stats from nflverse's `stats_player` release, matched to Sleeper
   players by normalized name, feeding the player-detail modal
-- `search_rank` from Sleeper stands in for a real draft rank — it's a
-  popularity-based ordering Sleeper computes, not an expert consensus rank
-  or ADP. It's a real, live number, just not the right one long-term.
+- Bye weeks, derived from nflverse's full season schedule (see below)
+- Rank is FantasyPros' real expert-consensus rank (ECR, aggregated across
+  100+ analysts) when available, falling back to Sleeper's popularity-based
+  `search_rank` for anyone FantasyPros doesn't cover
 
 **Important caveat: unverified against live network.** This was built and
 committed from a sandboxed session whose network policy blocks outbound
@@ -48,25 +49,55 @@ npm run sync            # runs scripts/sync-players.js once, prints a JSON summa
 ```
 
 A clean run ends with `OK — N players in the database.` A source that fails
-prints its own error under `sleeper` / `nflverseStats` / `nflverseInjuries`
-in the JSON — most likely cause is nflverse having renamed a release asset
+prints its own error under its own key in the JSON (`sleeper`,
+`nflverseStats`, `nflverseInjuries`, `nflverseSchedules`, `fantasyPros`) —
+most likely cause for an nflverse source is a renamed release asset
 (`pickCsvAsset()` in `src/sync/nflverse.js` guesses at naming; adjust its
-heuristic once you see what's actually attached to the `stats_player` /
-`injuries` tags today) or a transient GitHub/Sleeper rate limit.
+heuristic once you see what's actually attached to the relevant tag today),
+for Sleeper a transient rate limit, and for FantasyPros either the key or
+its quota — see the FantasyPros section below before assuming it's broken.
 
-**Still to build — a real expert-consensus rank:**
+**FantasyPros ECR — built.** `src/sync/fantasypros.js` calls
+`GET /nfl/{season}/consensus-rankings` (`x-api-key` header, `position=ALL`
+so it's one call for the whole player pool rather than one per position)
+and writes `ecr_rank`/`ecr_tier` onto `players`. `GET /api/players` exposes
+a single `rank` field that's `ecr_rank ?? search_rank`, so nothing
+downstream (the frontend merge, the player-detail modal) has to know which
+source actually supplied it.
 
-| Source | What it gives you | Access |
-|---|---|---|
-| [FantasyPros API](https://www.fantasypros.com/api-data/) | Expert-consensus rankings (ECR), ADP, and tiers aggregated from 130+ analysts — the actual "Boris Chen Tiers" experience, sourced, and a real replacement for `search_rank` | Free personal-use key on request ([how to request](https://support.fantasypros.com/hc/en-us/articles/49749297704475-How-do-I-request-access-to-the-FantasyPros-API)); commercial tier for production volume |
-| [ESPN's undocumented fantasy API](https://github.com/pseudo-r/Public-ESPN-API) | Rankings/projections matching what "ESPN Field Yates" already cites in the app | Free, unofficial, no auth — can change without notice, treat as best-effort |
+⚠️ **Two things about this specific key that matter more than the others:**
 
-**Plan:** add `src/sync/fantasypros.js` alongside the existing `sleeper.js`/
-`nflverse.js`, wire it into `runSync()` the same way (independent try/catch,
-its own row in the sync result), and add a `rank` column to `players` sourced
-from FantasyPros ECR — with `search_rank` as the fallback for any player
-FantasyPros doesn't cover. `syncPlayersFromAPI()` on the frontend already
-reads whatever `rank` comes back; nothing there needs to change.
+1. **Free tier is personal/non-commercial use only.** This app cannot
+   monetize, resell, or redistribute FantasyPros-derived data — that's a
+   term of the free key, not a preference. Fine for a self-hosted draft
+   tool; stop and re-check the terms before this app is anyone's product.
+2. **The daily quota is real and not documented publicly** — it's shown in
+   your FantasyPros account dashboard, not in the API docs. `src/sync/
+   index.js` gates every FantasyPros call behind a cooldown
+   (`FANTASYPROS_SYNC_COOLDOWN_HOURS`, default 20h — effectively "once a
+   day") stored in a `sync_meta` table, independent of how often
+   `POST /api/sync/players` itself gets called (the sync button, a cron
+   job, testing — none of them burn quota if the cooldown hasn't elapsed).
+   A failed attempt does **not** start the cooldown, so a transient error
+   doesn't lock you out until tomorrow. Pass `force: true`
+   (`POST /api/sync/players?force=true`, or `npm run sync:force`) to
+   deliberately bypass it — check your actual quota number first.
+
+**Verified without spending real quota:** the request construction (URL,
+`x-api-key` header), the missing-key error, and the entire cooldown state
+machine (skip when fresh, bypass with `force`, a failed attempt not
+starting the clock) were all exercised directly — the last of those against
+a real timestamp, not a mock. What's *not* verified is the actual response
+shape from a real 200 — same caveat as Sleeper/nflverse, run `npm run sync`
+for real before trusting the field names in `syncFantasyPros()`
+(`player_name`, `rank_ecr`, `tier`) against what your key's calls actually
+return.
+
+**Still open:** ESPN's undocumented fantasy API
+([community docs](https://github.com/pseudo-r/Public-ESPN-API)) as a
+second/backup rankings source — not needed now that FantasyPros ECR is
+live, but free and worth having as a fallback if a FantasyPros call fails
+or the quota is exhausted for the day.
 
 **Bye weeks — built.** `src/sync/nflverse.js#fetchSchedules` +
 `src/sync/index.js#computeByeWeeks` derive each team's bye from the full
@@ -105,14 +136,17 @@ refreshed weekly, instead of the eight placeholder rows.
    cadence for most fantasy shows), insert into `insights`, and the existing
    `/api/insights` endpoint and Analyst Feed tab need no changes at all.
 
-## What this needs from you before Phase 2/3 can start
+## What Phase 3 still needs from you
 
-- A FantasyPros API key (free — [request form](https://support.fantasypros.com/hc/en-us/articles/49749297704475-How-do-I-request-access-to-the-FantasyPros-API))
 - A ListenNotes account/API key, and a decision on Whisper vs. a pay-per-hour
   transcription vendor
 - Where `backend/` actually runs day-to-day (so the sync job has somewhere to
   live on a schedule) — Railway/Render both support cron-style scheduled jobs
-  alongside a web service
+  alongside a web service; the same host should carry `FANTASYPROS_API_KEY`
+  and the other `FANTASYPROS_*` env vars from `backend/.env.example` — never
+  commit the real key, it goes in the host's environment variable settings
 
-Until those are in place, the app keeps working exactly as it does today —
-Phase 1 has no dependency on any of this.
+Phase 2 (Sleeper + nflverse + FantasyPros) is done and has no further
+dependency on you beyond the key you've already provided. Phase 1 has no
+dependency on any of this at all — the app keeps working exactly as it
+does today either way.
