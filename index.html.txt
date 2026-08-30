@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fantasy Draft Command Center</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+<header>Fantasy Draft Command Center</header>
+
+<div class="container">
+
+  <!-- LEFT PANEL -->
+  <div class="panel">
+    <h2>Rankings Source</h2>
+    <button onclick="loadESPN()">Fetch ESPN Rankings</button>
+    <textarea id="rankingsInput" placeholder="Paste rankings here..."></textarea>
+    <button onclick="parseRankings()">Load Rankings</button>
+
+    <h2>Prior Team</h2>
+    <textarea id="teamInput" placeholder="Paste last year's roster here..."></textarea>
+    <button onclick="parseTeam()">Load Team</button>
+
+    <h2>League Settings</h2>
+    <textarea id="leagueInput" placeholder="Paste league settings here..."></textarea>
+    <button onclick="parseLeague()">Load League</button>
+  </div>
+
+  <!-- CENTER PANEL -->
+  <div class="panel">
+    <h2>Keeper Engine</h2>
+    <table id="keeperTable">
+      <tr>
+        <th>Player</th>
+        <th>Round</th>
+        <th>Status</th>
+        <th>Keep?</th>
+      </tr>
+    </table>
+
+    <h2>Draft Board Preview</h2>
+    <div id="draftBoard"></div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel">
+    <h2>Best Available</h2>
+    <div id="bestAvailable"></div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
