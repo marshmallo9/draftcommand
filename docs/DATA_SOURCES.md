@@ -99,6 +99,40 @@ second/backup rankings source — not needed now that FantasyPros ECR is
 live, but free and worth having as a fallback if a FantasyPros call fails
 or the quota is exhausted for the day.
 
+### Making the sync actually visible
+
+The first pass of Phase 2 had a real gap: `ecr_rank`/`ecr_tier` landed in
+the database and the API response, but nothing in the UI showed a
+FantasyPros rank was any different from a hardcoded seed rank or Sleeper's
+`search_rank` — a successful sync just quietly moved a number. Fixed:
+
+- Every player's rank shows a small source badge in Explorer
+  (<span style="color:#3ECF8E">ECR</span> / <span style="color:#4DB8D8">SLP</span>,
+  gold for demo data) and the player-detail modal names the source and the
+  FantasyPros tier explicitly (`rankSourceLabel()` / `rankSourceBadge()` in
+  `index.html`)
+- `withTiers()` uses a player's real `ecrTier` instead of the app's
+  rank-gap heuristic whenever one is present — so a successful FantasyPros
+  sync visibly changes the Tiers & Scarcity tab, not just a number in
+  Explorer
+- **"Sync Players from API" now always does something visible**, even with
+  no backend reachable at all (e.g. the standalone artifact demo, or before
+  you've ever run a real sync): it falls back to `DEMO_SYNCED_PLAYERS`, a
+  small hardcoded sample using existing seed-data names with different
+  rank/tier values, clearly labeled everywhere as demo (gold `ECR·demo`
+  badges, `[Demo]` in the status line, called out in `lastSynced`) — same
+  fallback philosophy the Analyst Feed already used for insights, now
+  applied consistently to the other sync path
+- The sync status line now calls out FantasyPros specifically —
+  `N got a real FantasyPros rank`, `FantasyPros ECR skipped (cooldown)`, or
+  its own error — instead of lumping it into one generic "some sources
+  failed" message
+
+If you run a real sync and still don't see ECR badges, that's the real
+signal something's wrong (bad key, quota exhausted, response shape
+changed) — check the `fantasyPros` entry in the sync JSON before assuming
+the UI is the problem.
+
 **Bye weeks — built.** `src/sync/nflverse.js#fetchSchedules` +
 `src/sync/index.js#computeByeWeeks` derive each team's bye from the full
 season schedule (the one week a team appears in no game) and write it to

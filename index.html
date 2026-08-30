@@ -345,7 +345,7 @@ tr:hover td{background:var(--ink-800);}
           <span class="substat" id="playerSyncStatus"></span>
           <span class="substat" style="margin-left:auto;">Last synced: <b id="lastSynced">—</b></span>
         </div>
-        <p class="subtext" style="margin-top:-4px;">"Sync Players from API" pulls the live player pool (position, team, injury status, bye week) from Sleeper + nflverse, and rank from FantasyPros' expert consensus (ECR) — via the same backend as the Analyst Feed, no copy/paste. Falls back to Sleeper's popularity-based <code>search_rank</code> for any player FantasyPros doesn't cover. See <code>docs/DATA_SOURCES.md</code>.</p>
+        <p class="subtext" style="margin-top:-4px;">"Sync Players from API" pulls the live player pool (position, team, injury status, bye week) from Sleeper + nflverse, and rank from FantasyPros' expert consensus (ECR) — via the same backend as the Analyst Feed, no copy/paste. Falls back to Sleeper's popularity-based <code>search_rank</code> for any player FantasyPros doesn't cover, and to a small labeled demo sample if the backend can't be reached at all. Synced ranks show a source badge (<span style="color:var(--mint);">ECR</span> / <span style="color:var(--cyan);">SLP</span>) next to them in Explorer. See <code>docs/DATA_SOURCES.md</code>.</p>
         <textarea class="importbox" id="importBox" placeholder="Paste rows as: Name, Pos, Team, OverallRank, Bye (one player per line)
 Example:
 Ja'Marr Chase, WR, CIN, 4, 10
@@ -516,8 +516,9 @@ function openPlayerModal(playerId){
       <div class="stat-value"><span class="chip ${p.pos}">${p.pos}</span></div>
     </div>
     <div class="stat-cell">
-      <div class="stat-label">ESPN Rank / ADP</div>
+      <div class="stat-label">Rank</div>
       <div class="stat-value">#${p.rank}</div>
+      <div class="stat-comparison">${rankSourceLabel(p)}${p.ecrTier ? ' · Tier '+p.ecrTier : ''}</div>
     </div>
   </div>`;
   
@@ -557,8 +558,9 @@ function openPlayerModal(playerId){
   });
   html += `</tbody></table></div>`;
   
+  const rankCite = p.rankSource ? rankSourceLabel(p) : 'ESPN (Field Yates PPR, Aug 2026)';
   html += `<div class="source-cite">
-    <strong>Sources:</strong> 2025 Full-Season Stats from NFL.com & ESPN Fantasy | 2026 Schedule from NFL.com | Rankings from ESPN (Field Yates PPR, Aug 2026) | Comparisons drawn from position-group peer analysis
+    <strong>Sources:</strong> 2025 Full-Season Stats from NFL.com & ESPN Fantasy | 2026 Schedule from NFL.com | Rank from ${rankCite} | Comparisons drawn from position-group peer analysis
   </div>`;
   
   document.getElementById('modalTitle').textContent = p.name;
@@ -567,6 +569,25 @@ function openPlayerModal(playerId){
 }
 function closePlayerModal(){
   document.getElementById('playerModal').classList.remove('open');
+}
+
+// Where a player's `rank` actually came from — set by syncPlayersFromAPI().
+// Undefined means it's still the hardcoded preseason seed data.
+const RANK_SOURCE_LABELS = {
+  'ecr': 'FantasyPros ECR',
+  'ecr-demo': 'FantasyPros ECR (demo)',
+  'sleeper': 'Sleeper (popularity)',
+  'sleeper-demo': 'Sleeper (popularity, demo)',
+};
+const RANK_SOURCE_SHORT = { 'ecr':'ECR', 'ecr-demo':'ECR·demo', 'sleeper':'SLP', 'sleeper-demo':'SLP·demo' };
+const RANK_SOURCE_COLOR = { 'ecr':'var(--mint)', 'ecr-demo':'var(--gold)', 'sleeper':'var(--cyan)', 'sleeper-demo':'var(--gold)' };
+
+function rankSourceLabel(p){ return RANK_SOURCE_LABELS[p.rankSource] || 'Preseason seed'; }
+function rankSourceBadge(p){
+  const short = RANK_SOURCE_SHORT[p.rankSource];
+  if(!short) return '';
+  const color = RANK_SOURCE_COLOR[p.rankSource];
+  return ` <span style="font-family:var(--font-mono);font-size:8.5px;color:${color};border:1px solid ${color};border-radius:3px;padding:0 3px;white-space:nowrap;" title="${rankSourceLabel(p)}">${short}</span>`;
 }
 
 /* =========================================================
@@ -596,7 +617,11 @@ function withTiers(){
     let tier=1;
     arr.forEach((p,i)=>{
       if(i>0){ const gap = p.rank - arr[i-1].rank; if(gap > Math.max(4, arr[i-1].rank*0.15)) tier++; }
-      p.tier = tier;
+      // FantasyPros' own tier (real analyst consensus, synced onto the
+      // player) is more trustworthy than our rank-gap heuristic when we
+      // have one — but the heuristic counter still advances regardless, so
+      // neighboring non-ECR players keep a sensible tier progression.
+      p.tier = p.ecrTier || tier;
     });
   });
 }
@@ -648,7 +673,7 @@ function renderExplorer(){
 
   document.getElementById('explorerBody').innerHTML = list.map(p=>`
     <tr class="${p.drafted?'drafted':''}">
-      <td data-label="Rank" class="rankcell">${p.rank}</td>
+      <td data-label="Rank" class="rankcell">${p.rank}${rankSourceBadge(p)}</td>
       <td data-label="★"><button class="btn small" data-star="${p.id}" style="background:none;border:none;font-size:14px;color:${p.starred?'var(--gold)':'var(--ink-500)'};">★</button></td>
       <td data-label="Player" class="namecell" data-playerclick="${p.id}" style="cursor:pointer;">${p.name}${p.signal?` <span class="tag ${p.signal.type}" style="margin-left:6px;">${p.signal.type}</span>`:''}</td>
       <td data-label="Pos"><span class="chip ${p.pos}">${p.pos}</span></td>
@@ -1005,14 +1030,73 @@ function applySetup(){
   document.querySelectorAll('[data-slot]').forEach(inp=>{ state.rosterSlots[inp.dataset.slot]=parseInt(inp.value)||0; });
   renderAll();
 }
-// Pulls the real player pool from the backend's synced Sleeper + nflverse
-// data (see backend/src/sync/) and merges it into state.players the same
-// way parseImport() merges pasted rows — by name, update-in-place or add.
+// Small, clearly-labeled stand-in for a real /api/players response — used
+// only when the backend genuinely can't be reached, so clicking "Sync
+// Players from API" always visibly does *something* instead of just
+// failing (same philosophy as the Analyst Feed's FALLBACK_INSIGHTS). Reuses
+// existing seed-data names rather than inventing new stat lines; only the
+// rank/tier are demo values, deliberately different from their seed rank
+// so the effect of a sync is obvious.
+const DEMO_SYNCED_PLAYERS = [
+  { sleeper_id:'demo-chase', name:"Ja'Marr Chase", pos:'WR', team:'CIN', injury_status:null, ecr_rank:2, ecr_tier:1, bye_week:10, rank:2 },
+  { sleeper_id:'demo-cbrown', name:'Chase Brown', pos:'RB', team:'CIN', injury_status:null, ecr_rank:9, ecr_tier:2, bye_week:10, rank:9 },
+  { sleeper_id:'demo-bowers', name:'Brock Bowers', pos:'TE', team:'LV', injury_status:null, ecr_rank:11, ecr_tier:1, bye_week:8, rank:11 },
+  { sleeper_id:'demo-bucky', name:'Bucky Irving', pos:'RB', team:'TB', injury_status:'Questionable', ecr_rank:38, ecr_tier:4, bye_week:10, rank:38 },
+  { sleeper_id:'demo-kittle', name:'George Kittle', pos:'TE', team:'SF', injury_status:'Questionable', ecr_rank:20, ecr_tier:2, bye_week:9, rank:20 },
+];
+
+// Shared by the real sync path and the demo fallback below, so both
+// exercise identical merge logic — by name, update-in-place or add, same
+// pattern parseImport() uses for pasted rows.
+function mergeSyncedPlayers(synced, { demo = false } = {}){
+  let added = 0, updated = 0;
+  synced.forEach(sp => {
+    if(!sp.pos || !sp.name) return;
+    // sp.rank is FantasyPros' expert consensus rank when present, falling
+    // back to Sleeper's popularity-based search_rank.
+    const source = sp.ecr_rank ? (demo?'ecr-demo':'ecr') : (sp.rank ? (demo?'sleeper-demo':'sleeper') : null);
+    const existing = state.players.find(p => p.name.toLowerCase() === sp.name.toLowerCase());
+    if(existing){
+      existing.pos = sp.pos; existing.team = sp.team || existing.team;
+      if(sp.rank){ existing.rank = sp.rank; existing.rankSource = source; }
+      if(sp.ecr_tier) existing.ecrTier = sp.ecr_tier;
+      if(sp.bye_week) existing.bye = sp.bye_week;
+      if(sp.stats){ existing.stats2025 = { yds: sp.stats.yds, td: sp.stats.td, type: existing.stats2025?.type || 'Rec' }; }
+      updated++;
+    } else if(sp.rank) {
+      state.players.push({
+        id:'p'+(sp.sleeper_id||sp.name), name:sp.name, pos:sp.pos, team:sp.team||'', rank:sp.rank, bye:sp.bye_week||0,
+        rankSource: source, ecrTier: sp.ecr_tier || null,
+        stats2025: sp.stats ? { yds:sp.stats.yds, td:sp.stats.td, type:'Rec' } : { yds:0, td:0, type:'—' },
+        schedule2026: demo ? 'TBD (added by the demo sync — not a real player pool)' : 'TBD (full weekly matchups aren\'t synced yet, only the bye week — see docs/DATA_SOURCES.md)',
+        starred:false, drafted:false
+      });
+      added++;
+    }
+    if(sp.injury_status){
+      state.liveSignals[sp.name] = { type:'risk', note:`${demo?'[Demo] ':''}Live status from sync: ${sp.injury_status}.` };
+    }
+  });
+  state.players.sort((a,b)=>a.rank-b.rank);
+  return { added, updated };
+}
+
+// Pulls the real player pool from the backend's synced Sleeper + nflverse +
+// FantasyPros data (see backend/src/sync/) and merges it into state.players.
 async function syncPlayersFromAPI(){
   const statusEl = document.getElementById('playerSyncStatus');
   const btn = document.getElementById('btnSyncPlayers');
   btn.disabled = true;
   statusEl.textContent = 'Syncing…';
+
+  const useDemoFallback = (reason) => {
+    const { added, updated } = mergeSyncedPlayers(DEMO_SYNCED_PLAYERS, { demo:true });
+    state.lastSynced = `${new Date().toLocaleString()} — DEMO DATA (backend unreachable: ${reason}). Illustrative sample ranks only, not live.`;
+    document.getElementById('lastSynced').textContent = state.lastSynced;
+    statusEl.innerHTML = `<span style="color:var(--gold);">Demo: ${updated} updated, ${added} added — backend unreachable (${reason})</span>`;
+    renderAll();
+  };
+
   try{
     const triggerRes = await fetch(`${state.insightsApiBase}/api/sync/players`, { method:'POST' });
     if(!triggerRes.ok) throw new Error(`Sync trigger failed: ${triggerRes.status}`);
@@ -1025,7 +1109,7 @@ async function syncPlayersFromAPI(){
     if(failed.length === sourceKeys.length && !syncResult.playersInDb){
       // Nothing succeeded on this call, and the backend has never synced
       // successfully before either — genuinely nothing to merge.
-      statusEl.innerHTML = `<span style="color:var(--flare);">All sources failed (${syncResult.sleeper?.error || 'see backend logs'})</span>`;
+      useDemoFallback(syncResult.sleeper?.error || 'all sources failed');
       return;
     }
     // Even if today's live pull failed outright, the backend may still be
@@ -1036,40 +1120,25 @@ async function syncPlayersFromAPI(){
     if(!playersRes.ok) throw new Error(`Fetching synced players failed: ${playersRes.status}`);
     const synced = await playersRes.json();
 
-    let added = 0, updated = 0;
-    synced.forEach(sp => {
-      if(!sp.pos || !sp.name) return;
-      const existing = state.players.find(p => p.name.toLowerCase() === sp.name.toLowerCase());
-      // sp.rank is FantasyPros' expert consensus rank when the backend has
-      // it, falling back to Sleeper's popularity-based search_rank.
-      if(existing){
-        existing.pos = sp.pos; existing.team = sp.team || existing.team;
-        if(sp.rank) existing.rank = sp.rank;
-        if(sp.bye_week) existing.bye = sp.bye_week;
-        if(sp.stats){ existing.stats2025 = { yds: sp.stats.yds, td: sp.stats.td, type: existing.stats2025?.type || 'Rec' }; }
-        updated++;
-      } else if(sp.rank) {
-        state.players.push({
-          id:'p'+sp.sleeper_id, name:sp.name, pos:sp.pos, team:sp.team||'', rank:sp.rank, bye:sp.bye_week||0,
-          stats2025: sp.stats ? { yds:sp.stats.yds, td:sp.stats.td, type:'Rec' } : { yds:0, td:0, type:'—' },
-          schedule2026:'TBD (full weekly matchups aren\'t synced yet, only the bye week — see docs/DATA_SOURCES.md)',
-          starred:false, drafted:false
-        });
-        added++;
-      }
-      if(sp.injury_status){
-        state.liveSignals[sp.name] = { type:'risk', note:`Live status from sync: ${sp.injury_status}.` };
-      }
-    });
-    state.players.sort((a,b)=>a.rank-b.rank);
-    state.lastSynced = new Date().toLocaleString() + ' (Sleeper + nflverse via backend — rank is Sleeper search_rank)';
+    const { added, updated } = mergeSyncedPlayers(synced, { demo:false });
+    state.lastSynced = new Date().toLocaleString() + ' (Sleeper + nflverse + FantasyPros via backend)';
     document.getElementById('lastSynced').textContent = state.lastSynced;
 
-    const failNote = failed.length ? ` (${failed.join(', ')} unavailable this run)` : '';
-    statusEl.innerHTML = `<span style="color:var(--mint);">${updated} updated, ${added} added${failNote}</span>`;
+    // FantasyPros gets its own callout — it's gated by a cooldown (see
+    // docs/DATA_SOURCES.md), so "unavailable this run" can mean "skipped
+    // on purpose to protect the quota", not "broken".
+    const fp = syncResult.fantasyPros;
+    let fpNote = '';
+    if(fp?.skipped) fpNote = ` · FantasyPros ECR skipped (cooldown)`;
+    else if(fp?.ok && fp.matched) fpNote = ` · ${fp.matched} got a real FantasyPros rank`;
+    else if(fp && fp.ok === false) fpNote = ` · FantasyPros ECR failed (${fp.error})`;
+
+    const otherFailed = failed.filter(k => k !== 'fantasyPros');
+    const failNote = otherFailed.length ? ` (${otherFailed.join(', ')} unavailable this run)` : '';
+    statusEl.innerHTML = `<span style="color:var(--mint);">${updated} updated, ${added} added${failNote}${fpNote}</span>`;
     renderAll();
   }catch(err){
-    statusEl.innerHTML = `<span style="color:var(--flare);">${err.message}</span>`;
+    useDemoFallback(err.message);
   }finally{
     btn.disabled = false;
   }
