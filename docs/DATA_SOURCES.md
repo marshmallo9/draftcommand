@@ -16,25 +16,62 @@ Analyst insights served from `backend/` (Express + SQLite), seeded with
 hand-picked placeholder quotes. See `backend/README.md`. The Analyst Feed tab
 already talks to this over `GET /api/insights`.
 
-## Phase 2 — real rankings, ADP, stats & injuries
+## Phase 2 — real rankings, ADP, stats & injuries (Sleeper + nflverse: built; FantasyPros: not yet)
 
-Replaces the hardcoded `SEED_PLAYERS` table (rank/stats/schedule baked into
-the HTML) with a nightly sync job in `backend/` that pulls from:
+The Sleeper and nflverse pieces of this are implemented — `backend/src/sync/`,
+a `players` table, `GET /api/players`, `POST /api/sync/players`, and a
+"Sync Players from API" button on the Setup tab that merges the result into
+`state.players` the same way pasted rows already merge. What that gets you
+today:
+
+- Real player pool, position, team, and live injury status from Sleeper —
+  flows into the AI Insights risk list automatically (a live signal now
+  takes precedence over the hardcoded `SIGNAL_TAGS` seed data)
+- Season stats from nflverse's `stats_player` release, matched to Sleeper
+  players by normalized name, feeding the player-detail modal
+- `search_rank` from Sleeper stands in for a real draft rank — it's a
+  popularity-based ordering Sleeper computes, not an expert consensus rank
+  or ADP. It's a real, live number, just not the right one long-term.
+
+**Important caveat: unverified against live network.** This was built and
+committed from a sandboxed session whose network policy blocks outbound
+calls to `api.sleeper.app` and `api.github.com` (see PR discussion) — so the
+DB schema, upsert logic, API responses, and frontend merge were all tested
+end-to-end with synthetic data standing in for a real sync, but the actual
+HTTP calls to Sleeper and nflverse have not been exercised. Before trusting
+this:
+
+```bash
+cd backend
+npm install
+npm run sync            # runs scripts/sync-players.js once, prints a JSON summary + exit code
+```
+
+A clean run ends with `OK — N players in the database.` A source that fails
+prints its own error under `sleeper` / `nflverseStats` / `nflverseInjuries`
+in the JSON — most likely cause is nflverse having renamed a release asset
+(`pickCsvAsset()` in `src/sync/nflverse.js` guesses at naming; adjust its
+heuristic once you see what's actually attached to the `stats_player` /
+`injuries` tags today) or a transient GitHub/Sleeper rate limit.
+
+**Still to build — a real expert-consensus rank:**
 
 | Source | What it gives you | Access |
 |---|---|---|
-| [Sleeper API](https://docs.sleeper.com/) | Full NFL player pool with IDs, positions, injury status, and trending adds/drops (`/v1/players/nfl`, `/v1/players/nfl/trending/add`) | Free, no auth, no key. Rate-limited (~1000 req/min) — [guide](https://zuplo.com/learning-center/sleeper-api) |
-| [nflverse](https://github.com/nflverse/nflreadpy) (`nflreadpy`, successor to `nfl_data_py`) | Weekly/seasonal stats, injury reports (`import_injuries`), depth charts, schedules, rosters — everything the player modal's "2025 Stats" and "2026 Schedule" panels currently fake | Free, open-source, no key |
-| [FantasyPros API](https://www.fantasypros.com/api-data/) | Expert-consensus rankings (ECR), ADP, and tiers aggregated from 130+ analysts — the actual "Boris Chen Tiers" experience, sourced | Free personal-use key on request ([how to request](https://support.fantasypros.com/hc/en-us/articles/49749297704475-How-do-I-request-access-to-the-FantasyPros-API)); commercial tier for production volume |
+| [FantasyPros API](https://www.fantasypros.com/api-data/) | Expert-consensus rankings (ECR), ADP, and tiers aggregated from 130+ analysts — the actual "Boris Chen Tiers" experience, sourced, and a real replacement for `search_rank` | Free personal-use key on request ([how to request](https://support.fantasypros.com/hc/en-us/articles/49749297704475-How-do-I-request-access-to-the-FantasyPros-API)); commercial tier for production volume |
 | [ESPN's undocumented fantasy API](https://github.com/pseudo-r/Public-ESPN-API) | Rankings/projections matching what "ESPN Field Yates" already cites in the app | Free, unofficial, no auth — can change without notice, treat as best-effort |
 
-**Plan:** a scheduled job in `backend/` (cron, e.g. nightly) pulls Sleeper +
-nflverse + FantasyPros, normalizes into the existing player shape
-(`name, pos, team, rank, bye, stats2025, schedule2026`), and exposes it at a
-new `GET /api/players` endpoint. The frontend's "Parse & Merge" import flow
-already knows how to merge a player list by name — point it at the API
-response instead of a pasted textarea, and the manual sync becomes optional
-rather than the only path.
+**Plan:** add `src/sync/fantasypros.js` alongside the existing `sleeper.js`/
+`nflverse.js`, wire it into `runSync()` the same way (independent try/catch,
+its own row in the sync result), and add a `rank` column to `players` sourced
+from FantasyPros ECR — with `search_rank` as the fallback for any player
+FantasyPros doesn't cover. `syncPlayersFromAPI()` on the frontend already
+reads whatever `rank` comes back; nothing there needs to change.
+
+**Also not yet synced:** bye weeks and full 2026 schedules — nflverse has
+this (via the `schedules` release, or `nfldata`'s `games.csv`), it just
+isn't wired up yet. New players added by sync currently get `bye: 0` and a
+placeholder schedule string until that's built.
 
 ## Phase 3 — real podcast ingestion ("week to week" insights)
 

@@ -337,12 +337,15 @@ tr:hover td{background:var(--ink-800);}
         <p class="subtext" style="margin-bottom:12px;">
           A static HTML file can't live-scrape data (browsers block cross-site requests). Instead, open the sources below in a new tab, copy player rows, and paste. The tool re-scores VBD, tiers, and edge instantly.
         </p>
-        <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <button class="btn" id="btnOpenEspn">ESPN Field Yates ↗</button>
           <button class="btn" onclick="window.open('http://www.borischen.co/p/ppr-wide-receiver-tier-rankings.html','_blank')">Boris Chen Tiers ↗</button>
           <button class="btn" onclick="window.open('https://www.nfl.com/stats/player','_blank')">NFL.com Stats ↗</button>
+          <button class="btn primary" id="btnSyncPlayers">Sync Players from API</button>
+          <span class="substat" id="playerSyncStatus"></span>
           <span class="substat" style="margin-left:auto;">Last synced: <b id="lastSynced">—</b></span>
         </div>
+        <p class="subtext" style="margin-top:-4px;">"Sync Players from API" pulls the live player pool (position, team, injury status) from Sleeper and season stats from nflverse via the same backend as the Analyst Feed — no copy/paste. Rank is Sleeper's <code>search_rank</code>, a popularity-based proxy, not an expert consensus rank; that's the next thing to swap in once a FantasyPros key exists (see <code>docs/DATA_SOURCES.md</code>).</p>
         <textarea class="importbox" id="importBox" placeholder="Paste rows as: Name, Pos, Team, OverallRank, Bye (one player per line)
 Example:
 Ja'Marr Chase, WR, CIN, 4, 10
@@ -394,7 +397,8 @@ const state = {
   lastSynced: 'Aug 30, 2026 (seeded from ESPN preseason rankings)',
   insightsApiBase: 'http://localhost:3001',
   insights: [],
-  insightsConnected: false
+  insightsConnected: false,
+  liveSignals: {} // name -> {type, note}, populated by syncPlayersFromAPI() from real injury data
 };
 
 /* =========================================================
@@ -604,7 +608,9 @@ function withEdge(){
     const min = Math.min(...vbds), max = Math.max(...vbds);
     arr.forEach(p=>{
       let base = max>min ? ((p.vbd-min)/(max-min))*100 : 50;
-      const sig = SIGNAL_TAGS[p.name];
+      // A live-synced signal (real injury status) is more current than the
+      // hardcoded seed tags, so it takes precedence when both exist.
+      const sig = state.liveSignals[p.name] || SIGNAL_TAGS[p.name];
       if(sig){
         if(sig.type==='breakout') base += 10;
         if(sig.type==='value') base += 6;
@@ -999,6 +1005,70 @@ function applySetup(){
   document.querySelectorAll('[data-slot]').forEach(inp=>{ state.rosterSlots[inp.dataset.slot]=parseInt(inp.value)||0; });
   renderAll();
 }
+// Pulls the real player pool from the backend's synced Sleeper + nflverse
+// data (see backend/src/sync/) and merges it into state.players the same
+// way parseImport() merges pasted rows — by name, update-in-place or add.
+async function syncPlayersFromAPI(){
+  const statusEl = document.getElementById('playerSyncStatus');
+  const btn = document.getElementById('btnSyncPlayers');
+  btn.disabled = true;
+  statusEl.textContent = 'Syncing…';
+  try{
+    const triggerRes = await fetch(`${state.insightsApiBase}/api/sync/players`, { method:'POST' });
+    if(!triggerRes.ok) throw new Error(`Sync trigger failed: ${triggerRes.status}`);
+    const syncResult = await triggerRes.json();
+
+    const failed = ['sleeper','nflverseStats','nflverseInjuries'].filter(k => syncResult[k] && !syncResult[k].ok);
+    if(failed.length === 3 && !syncResult.playersInDb){
+      // Nothing succeeded on this call, and the backend has never synced
+      // successfully before either — genuinely nothing to merge.
+      statusEl.innerHTML = `<span style="color:var(--flare);">All sources failed (${syncResult.sleeper?.error || 'see backend logs'})</span>`;
+      return;
+    }
+    // Even if today's live pull failed outright, the backend may still be
+    // holding good data from an earlier successful sync — merge whatever's
+    // there rather than discarding it.
+
+    const playersRes = await fetch(`${state.insightsApiBase}/api/players`);
+    if(!playersRes.ok) throw new Error(`Fetching synced players failed: ${playersRes.status}`);
+    const synced = await playersRes.json();
+
+    let added = 0, updated = 0;
+    synced.forEach(sp => {
+      if(!sp.pos || !sp.name) return;
+      const existing = state.players.find(p => p.name.toLowerCase() === sp.name.toLowerCase());
+      if(existing){
+        existing.pos = sp.pos; existing.team = sp.team || existing.team;
+        if(sp.search_rank) existing.rank = sp.search_rank;
+        if(sp.stats){ existing.stats2025 = { yds: sp.stats.yds, td: sp.stats.td, type: existing.stats2025?.type || 'Rec' }; }
+        updated++;
+      } else if(sp.search_rank) {
+        state.players.push({
+          id:'p'+sp.sleeper_id, name:sp.name, pos:sp.pos, team:sp.team||'', rank:sp.search_rank, bye:0,
+          stats2025: sp.stats ? { yds:sp.stats.yds, td:sp.stats.td, type:'Rec' } : { yds:0, td:0, type:'—' },
+          schedule2026:'TBD (sync from real schedule source is a Phase 2 follow-up — see docs/DATA_SOURCES.md)',
+          starred:false, drafted:false
+        });
+        added++;
+      }
+      if(sp.injury_status){
+        state.liveSignals[sp.name] = { type:'risk', note:`Live status from sync: ${sp.injury_status}.` };
+      }
+    });
+    state.players.sort((a,b)=>a.rank-b.rank);
+    state.lastSynced = new Date().toLocaleString() + ' (Sleeper + nflverse via backend — rank is Sleeper search_rank)';
+    document.getElementById('lastSynced').textContent = state.lastSynced;
+
+    const failNote = failed.length ? ` (${failed.join(', ')} unavailable this run)` : '';
+    statusEl.innerHTML = `<span style="color:var(--mint);">${updated} updated, ${added} added${failNote}</span>`;
+    renderAll();
+  }catch(err){
+    statusEl.innerHTML = `<span style="color:var(--flare);">${err.message}</span>`;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
 function parseImport(){
   const raw = document.getElementById('importBox').value.trim();
   if(!raw){ document.getElementById('importStatus').textContent = 'Nothing to parse.'; return; }
@@ -1069,6 +1139,7 @@ function bindEvents(){
   document.getElementById('btnApplySetup').onclick = applySetup;
   document.getElementById('btnOpenEspn').onclick = ()=>window.open('https://www.espn.com/fantasy/football/story/_/id/48711830/2026-fantasy-football-rankings-ppr-field-yates','_blank');
   document.getElementById('btnParseImport').onclick = parseImport;
+  document.getElementById('btnSyncPlayers').onclick = syncPlayersFromAPI;
   document.getElementById('insightPlayerBox').oninput = renderInsightGrid;
   document.getElementById('insightAnalystBox').oninput = renderInsightGrid;
   document.getElementById('btnTestInsights').onclick = testInsightsConnection;

@@ -5,11 +5,13 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "sync": "node scripts/sync-players.js"
   },
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
+    "csv-parse": "^7.0.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "sqlite3": "^5.1.7"

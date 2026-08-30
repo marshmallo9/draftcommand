@@ -1,12 +1,15 @@
-# Podcast Insights Backend (MVP)
+# Draft Command Backend
 
-Lightweight backend that serves analyst/podcast insights (player quotes, opinions,
-breakout/risk calls) to the Draft Command Center frontend.
+Backend for the Draft Research Lab frontend: analyst/podcast insights (player
+quotes, opinions, breakout/risk calls), and a real player pool synced from
+Sleeper + nflverse.
 
-This is intentionally a **light build**: no audio transcription, no ListenNotes
-polling, no Whisper API. Insights are hand-curated placeholder quotes seeded
-into SQLite on first run. The API and schema are shaped so real transcription
-can be swapped in later without changing the frontend contract.
+Insights are still hand-curated placeholder quotes (light build — no audio
+transcription yet). Player sync is real and live: Sleeper for the player
+pool/position/team/injury status, nflverse for season stats. Both are shaped
+so more sources (FantasyPros ECR, real podcast transcription) drop in later
+without changing the frontend contract — see
+[`docs/DATA_SOURCES.md`](../docs/DATA_SOURCES.md).
 
 ## Stack
 
@@ -75,13 +78,69 @@ insights are on file for them.
 
 Simple liveness check, returns `{ "status": "ok" }`.
 
+### `GET /api/players`
+
+Returns the synced player pool. Empty until a sync has run at least once.
+
+Query params (all optional, combinable): `position` (exact, e.g. `RB`), `team`
+(exact, e.g. `CIN`), `search` (substring on name).
+
+```json
+[
+  {
+    "sleeper_id": "4034",
+    "name": "Ja'Marr Chase",
+    "pos": "WR",
+    "team": "CIN",
+    "status": "Active",
+    "injury_status": null,
+    "search_rank": 5,
+    "synced_at": "2026-08-30T19:59:17.502Z",
+    "stats": { "yds": 1780, "td": 17, "raw": { "...": "whatever nflverse's row actually had" } }
+  }
+]
+```
+
+`search_rank` is Sleeper's popularity-based ordering, not an expert
+consensus rank — see `docs/DATA_SOURCES.md` for the plan to replace it with
+FantasyPros ECR.
+
+### `POST /api/sync/players`
+
+Pulls fresh data from Sleeper and nflverse and upserts into the `players`
+table (see `src/sync/`). Idempotent — safe to call repeatedly. Always
+responds `200` with a per-source result, even if every source failed:
+
+```json
+{
+  "sleeper": { "ok": true, "count": 2841 },
+  "nflverseStats": { "ok": true, "total": 4102, "matched": 2390 },
+  "nflverseInjuries": { "ok": true, "total": 88, "matched": 12 },
+  "playersInDb": 2841
+}
+```
+
+No auth on this MVP endpoint. Either protect it before it's public-facing,
+or only ever call it from a scheduled job (`npm run sync` /
+`scripts/sync-players.js`) rather than exposing the route.
+
+**This has not been exercised against the live Sleeper/nflverse APIs** — it
+was built in a sandboxed session whose network policy blocks those hosts.
+The DB layer, upsert logic, and API responses were verified end-to-end with
+synthetic data standing in for a real sync; the actual HTTP calls haven't
+been. Run `npm run sync` once wherever this actually has internet access
+before trusting it — see `docs/DATA_SOURCES.md` for what a clean run looks
+like and how to debug a source that fails.
+
 ## Frontend integration
 
 The repo's `index.html` (the Draft Research Lab app) has an **Analyst Feed**
-tab that talks to this backend directly, plus a **Backend URL** field on its
-Setup tab (defaults to `http://localhost:3001`) to point it elsewhere. If the
-backend is unreachable, the tab falls back to a small embedded sample so the
-page still works standalone.
+tab that talks to this backend directly, and a **Setup** tab with a
+**Backend URL** field (defaults to `http://localhost:3001`) plus a
+**Sync Players from API** button that calls `POST /api/sync/players` then
+merges `GET /api/players` into the app's player pool. If the backend is
+unreachable, the Analyst Feed tab falls back to a small embedded sample so
+the page still works standalone; the sync button just reports the failure.
 
 ## Swapping mock data for something real
 
