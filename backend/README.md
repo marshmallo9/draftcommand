@@ -75,7 +75,20 @@ insights are on file for them.
 
 Simple liveness check, returns `{ "status": "ok" }`.
 
+## Frontend integration
+
+The repo's `index.html` (the Draft Research Lab app) has an **Analyst Feed**
+tab that talks to this backend directly, plus a **Backend URL** field on its
+Setup tab (defaults to `http://localhost:3001`) to point it elsewhere. If the
+backend is unreachable, the tab falls back to a small embedded sample so the
+page still works standalone.
+
 ## Swapping mock data for something real
+
+See [`docs/DATA_SOURCES.md`](../docs/DATA_SOURCES.md) for a sourced roadmap —
+real rankings/stats via Sleeper, nflverse and FantasyPros, and real podcast
+ingestion via ListenNotes + transcription + Claude extraction — that plugs
+into this same schema and API contract.
 
 Everything downstream of `src/data/insights-mock.json` only cares about the
 shape of that JSON. To replace it with real data:
