@@ -92,3 +92,100 @@ table th, table td {
 .keeper-ok {
   background: rgba(63,185,80,0.2);
 }
+
+.panel-wide {
+  width: 100%;
+}
+
+.subtext {
+  color: #8b949e;
+  font-size: 13px;
+  margin: 4px 0 12px;
+}
+
+.filterbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.filterbar input {
+  flex: 1;
+  min-width: 160px;
+  background: #0d1117;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.filterbar button {
+  margin-top: 0;
+}
+
+.insight-card {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.insight-card:last-child {
+  border-bottom: none;
+}
+
+.insight-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.insight-meta .chip {
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(47,129,247,0.2);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.insight-player {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.insight-date {
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.insight-source {
+  color: #8b949e;
+  font-size: 13px;
+  margin-bottom: 6px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.opinion-badge {
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(63,185,80,0.2);
+  color: var(--success);
+  font-size: 11px;
+}
+
+.insight-timestamp {
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.insight-quote {
+  font-size: 13px;
+  color: var(--text);
+  font-style: italic;
+}

@@ -51,6 +51,29 @@
 
 </div>
 
+<!-- ANALYST INSIGHTS -->
+<div class="container">
+  <div class="panel panel-wide">
+    <h2>Analyst Insights</h2>
+    <p class="subtext">What experts are saying about draft picks. Search by player, position, or analyst. (Placeholder quotes for now &mdash; real podcast transcription comes later.)</p>
+
+    <div class="filterbar">
+      <input type="text" id="insightPlayer" placeholder="Player name…">
+      <input type="text" id="insightPosition" placeholder="Position (RB, WR, TE, QB)…">
+      <input type="text" id="insightAnalyst" placeholder="Analyst…">
+      <button onclick="loadInsights()">Search</button>
+    </div>
+
+    <div id="insightsList"></div>
+  </div>
+</div>
+
+<script>
+  // Points at the podcast-insights backend (see backend/README.md).
+  // Override by setting window.INSIGHTS_API_BASE before this script runs,
+  // e.g. when deploying the backend to Railway/Render.
+  window.INSIGHTS_API_BASE = window.INSIGHTS_API_BASE || "http://localhost:3001";
+</script>
 <script src="app.js"></script>
 
 </body>
