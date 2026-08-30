@@ -68,10 +68,18 @@ from FantasyPros ECR — with `search_rank` as the fallback for any player
 FantasyPros doesn't cover. `syncPlayersFromAPI()` on the frontend already
 reads whatever `rank` comes back; nothing there needs to change.
 
-**Also not yet synced:** bye weeks and full 2026 schedules — nflverse has
-this (via the `schedules` release, or `nfldata`'s `games.csv`), it just
-isn't wired up yet. New players added by sync currently get `bye: 0` and a
-placeholder schedule string until that's built.
+**Bye weeks — built.** `src/sync/nflverse.js#fetchSchedules` +
+`src/sync/index.js#computeByeWeeks` derive each team's bye from the full
+season schedule (the one week a team appears in no game) and write it to
+`players.bye_week`, same untested-against-live-network caveat as everything
+else in this phase. `computeByeWeeks()` itself is a pure function and *was*
+unit-tested directly with synthetic schedule rows — the deriving logic is
+verified, just not the real CSV feeding it.
+
+**Still not synced:** full weekly matchups (the player modal's "2026
+Schedule" panel) — nflverse has this too, just not wired up. New players
+added by sync get a placeholder string there until that's built; existing
+seed players keep their hardcoded schedule text.
 
 ## Phase 3 — real podcast ingestion ("week to week" insights)
 

@@ -11,7 +11,9 @@ init()
   .then(runSync)
   .then((result) => {
     console.log(JSON.stringify(result, null, 2));
-    const failed = ['sleeper', 'nflverseStats', 'nflverseInjuries'].filter(k => result[k] && !result[k].ok);
+    // Derived rather than a hardcoded key list, so a new sync source added
+    // to runSync() is automatically covered here too.
+    const failed = Object.keys(result).filter(k => result[k] && typeof result[k] === 'object' && result[k].ok === false);
     if (failed.length) {
       console.error(`\n${failed.length} source(s) failed: ${failed.join(', ')} — see "error" above for each.`);
       process.exitCode = 1;

@@ -18,7 +18,7 @@ router.get('/players', async (req, res, next) => {
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const rows = await all(
-      `SELECT sleeper_id, name, pos, team, status, injury_status, search_rank, season_stats_json, synced_at
+      `SELECT sleeper_id, name, pos, team, status, injury_status, search_rank, bye_week, season_stats_json, synced_at
        FROM players ${where} ORDER BY search_rank ASC NULLS LAST, name ASC`,
       params
     );

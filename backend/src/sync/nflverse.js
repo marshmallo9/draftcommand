@@ -59,4 +59,16 @@ async function fetchInjuries(season) {
   return fetchCsvRows(asset.url);
 }
 
-module.exports = { listReleaseAssets, pickCsvAsset, fetchPlayerStats, fetchInjuries };
+// The full season schedule (all weeks, both played and future) — this is
+// what bye weeks get derived from. nflverse's "schedules" release typically
+// ships one CSV covering many seasons at once rather than per-season files,
+// so pickCsvAsset's season-suffix matching often falls through to its
+// no-year-in-filename fallback here, which is expected.
+async function fetchSchedules(season) {
+  const assets = await listReleaseAssets('schedules');
+  const asset = pickCsvAsset(assets, season);
+  if (!asset) throw new Error('No CSV asset found on the nflverse "schedules" release');
+  return fetchCsvRows(asset.url);
+}
+
+module.exports = { listReleaseAssets, pickCsvAsset, fetchPlayerStats, fetchInjuries, fetchSchedules };

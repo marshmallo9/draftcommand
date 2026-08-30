@@ -1,6 +1,6 @@
 const { run, get, all } = require('../db');
 const { fetchSleeperPlayers } = require('./sleeper');
-const { fetchPlayerStats, fetchInjuries } = require('./nflverse');
+const { fetchPlayerStats, fetchInjuries, fetchSchedules } = require('./nflverse');
 const { normalizeName } = require('./normalize');
 
 const CURRENT_SEASON = new Date().getFullYear();
@@ -70,6 +70,49 @@ async function syncNflverseInjuries() {
   return { total: rows.length, matched };
 }
 
+// Derives each team's bye week from the full schedule: the one week in the
+// regular season where a team appears in no game. Column names for
+// week/home_team/away_team/game_type have been stable in nflverse for a
+// long time, but we still skip a team rather than guess if its data looks
+// incomplete (0 or >1 missing weeks) — a wrong bye week is worse than a
+// missing one.
+function computeByeWeeks(scheduleRows) {
+  const regRows = scheduleRows.filter(r => !('game_type' in r) || r.game_type === 'REG');
+  const seasonRows = regRows.filter(r => !r.season || String(r.season) === String(CURRENT_SEASON));
+
+  const weeksByTeam = {};
+  let maxWeek = 0;
+  for (const row of seasonRows) {
+    const week = Number(row.week);
+    if (!week) continue;
+    maxWeek = Math.max(maxWeek, week);
+    for (const team of [row.home_team, row.away_team]) {
+      if (!team) continue;
+      if (!weeksByTeam[team]) weeksByTeam[team] = new Set();
+      weeksByTeam[team].add(week);
+    }
+  }
+
+  const byeByTeam = {};
+  for (const [team, weeksSet] of Object.entries(weeksByTeam)) {
+    const missing = [];
+    for (let w = 1; w <= maxWeek; w++) if (!weeksSet.has(w)) missing.push(w);
+    if (missing.length === 1) byeByTeam[team] = missing[0];
+  }
+  return byeByTeam;
+}
+
+async function syncNflverseSchedules() {
+  const rows = await fetchSchedules(CURRENT_SEASON);
+  const byeByTeam = computeByeWeeks(rows);
+  let playersUpdated = 0;
+  for (const [team, week] of Object.entries(byeByTeam)) {
+    const res = await run('UPDATE players SET bye_week = ? WHERE team = ?', [week, team]);
+    playersUpdated += res.changes;
+  }
+  return { teamsResolved: Object.keys(byeByTeam).length, playersUpdated };
+}
+
 // Runs every source independently — one failing (bad tag, network blip,
 // nflverse renamed a file) never blocks the others or crashes the caller.
 async function runSync() {
@@ -96,10 +139,17 @@ async function runSync() {
     result.nflverseInjuries = { ok: false, error: err.message };
   }
 
+  try {
+    const { teamsResolved, playersUpdated } = await syncNflverseSchedules();
+    result.nflverseSchedules = { ok: true, teamsResolved, playersUpdated };
+  } catch (err) {
+    result.nflverseSchedules = { ok: false, error: err.message };
+  }
+
   const row = await get('SELECT COUNT(*) AS count FROM players');
   result.playersInDb = row.count;
   result.finishedAt = new Date().toISOString();
   return result;
 }
 
-module.exports = { runSync, summarizeStatsRow, CURRENT_SEASON };
+module.exports = { runSync, summarizeStatsRow, computeByeWeeks, CURRENT_SEASON };

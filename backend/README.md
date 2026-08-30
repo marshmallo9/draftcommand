@@ -95,11 +95,15 @@ Query params (all optional, combinable): `position` (exact, e.g. `RB`), `team`
     "status": "Active",
     "injury_status": null,
     "search_rank": 5,
+    "bye_week": 10,
     "synced_at": "2026-08-30T19:59:17.502Z",
     "stats": { "yds": 1780, "td": 17, "raw": { "...": "whatever nflverse's row actually had" } }
   }
 ]
 ```
+
+`bye_week` is `null` until that player's team has been matched against a
+synced schedule — see `src/sync/index.js#computeByeWeeks`.
 
 `search_rank` is Sleeper's popularity-based ordering, not an expert
 consensus rank — see `docs/DATA_SOURCES.md` for the plan to replace it with
@@ -116,6 +120,7 @@ responds `200` with a per-source result, even if every source failed:
   "sleeper": { "ok": true, "count": 2841 },
   "nflverseStats": { "ok": true, "total": 4102, "matched": 2390 },
   "nflverseInjuries": { "ok": true, "total": 88, "matched": 12 },
+  "nflverseSchedules": { "ok": true, "teamsResolved": 32, "playersUpdated": 2841 },
   "playersInDb": 2841
 }
 ```

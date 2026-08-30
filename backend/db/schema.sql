@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS players (
   search_rank INTEGER,          -- Sleeper's search_rank: a popularity-based proxy for ADP,
                                  -- NOT an expert consensus rank. Swap for FantasyPros ECR
                                  -- once that API key exists (see docs/DATA_SOURCES.md).
+  bye_week INTEGER,             -- derived from nflverse's schedules release (the one week a
+                                 -- team appears in no game); null until that team's schedule
+                                 -- has been matched, or if the gap couldn't be determined cleanly
   season_stats_json TEXT,       -- raw matched row from nflverse player_stats, stored as-is
                                  -- (column names vary by season/source revision, so we don't
                                  -- assume a fixed shape — consumers read defensively)
