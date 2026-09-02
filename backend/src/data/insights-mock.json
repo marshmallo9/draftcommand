@@ -1,0 +1,93 @@
+{
+  "_note": "Placeholder data for MVP wiring. These are illustrative example quotes, not verified transcriptions of real broadcasts. Swap this file (or the seed source) for real ListenNotes/Whisper output later — the schema is already shaped for it (timestamp + source_url are stubbed null).",
+  "insights": [
+    {
+      "analyst": "Fantasy Footballers",
+      "podcast": "The Fantasy Footballers Podcast",
+      "date": "2024-09-05",
+      "player": "Chase Brown",
+      "position": "RB",
+      "opinion": "Breakout",
+      "quote": "Chase Brown is going to have a huge year. The Bengals are committing to the run game.",
+      "timestamp": "12:34",
+      "source_url": null
+    },
+    {
+      "analyst": "Boris Chen",
+      "podcast": "Boris Chen Tier Rankings",
+      "date": "2024-09-04",
+      "player": "Ja'Marr Chase",
+      "position": "WR",
+      "opinion": "Elite",
+      "quote": "Chase is the safest WR in the draft. Elite target share, elite team.",
+      "timestamp": null,
+      "source_url": null
+    },
+    {
+      "analyst": "FantasyPros",
+      "podcast": "FantasyPros Podcast",
+      "date": "2024-09-03",
+      "player": "Bucky Irving",
+      "position": "RB",
+      "opinion": "Risk",
+      "quote": "Shoulder injury is concerning. Workload unclear with Gainwell.",
+      "timestamp": "27:10",
+      "source_url": null
+    },
+    {
+      "analyst": "Fantasy Footballers",
+      "podcast": "The Fantasy Footballers Podcast",
+      "date": "2024-09-02",
+      "player": "Marvin Harrison Jr.",
+      "position": "WR",
+      "opinion": "Breakout",
+      "quote": "Best pure prospect we've evaluated in years. Target share comes immediately.",
+      "timestamp": "05:48",
+      "source_url": null
+    },
+    {
+      "analyst": "Matthew Berry",
+      "podcast": "Fantasy Life",
+      "date": "2024-09-01",
+      "player": "Jonathon Brooks",
+      "position": "RB",
+      "opinion": "Avoid",
+      "quote": "I love the talent, but coming off an ACL to start the year is too much risk for me in the first five rounds.",
+      "timestamp": "19:02",
+      "source_url": null
+    },
+    {
+      "analyst": "FantasyPros",
+      "podcast": "FantasyPros Podcast",
+      "date": "2024-08-30",
+      "player": "Trey McBride",
+      "position": "TE",
+      "opinion": "Value",
+      "quote": "He's a top-five tight end at a QB2-round price. That's a gap you take advantage of.",
+      "timestamp": "41:15",
+      "source_url": null
+    },
+    {
+      "analyst": "Boris Chen",
+      "podcast": "Boris Chen Tier Rankings",
+      "date": "2024-08-28",
+      "player": "Rashee Rice",
+      "position": "WR",
+      "opinion": "Risk",
+      "quote": "The off-field situation puts a real games-missed floor risk on an otherwise great profile.",
+      "timestamp": null,
+      "source_url": null
+    },
+    {
+      "analyst": "Matthew Berry",
+      "podcast": "Fantasy Life",
+      "date": "2024-08-25",
+      "player": "Chase Brown",
+      "position": "RB",
+      "opinion": "Value",
+      "quote": "He's going a round and a half later than the workload projects. Easy value pick.",
+      "timestamp": "08:20",
+      "source_url": null
+    }
+  ]
+}

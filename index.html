@@ -1,57 +1,1233 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Fantasy Draft Command Center</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Meatheads — Draft Research Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink-950:#0B0D10; --ink-900:#101319; --ink-800:#161A20; --ink-650:#232933; --ink-500:#3A4250;
+  --paper-100:#E8E6DF; --paper-300:#B9B6AC;
+  --flare:#FF5A36; --mint:#3ECF8E; --gold:#E8B33D; --cyan:#4DB8D8;
+  --pos-qb:#C94F4F; --pos-rb:#3E8E5A; --pos-wr:#3E7CB1; --pos-te:#C97A3E; --pos-k:#8B6FB3; --pos-dst:#6B7280; --pos-idp:#4FA8A0;
+  --font-display:'Oswald','Arial Narrow',sans-serif;
+  --font-body:'Inter',-apple-system,sans-serif;
+  --font-mono:'IBM Plex Mono','Courier New',monospace;
+  --gradient-primary:linear-gradient(135deg, var(--flare), var(--gold));
+  --gradient-mint:linear-gradient(135deg, var(--mint), var(--cyan));
+  --gradient-dark:linear-gradient(135deg, var(--ink-900), var(--ink-800));
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;background:var(--ink-950);color:var(--paper-100);font-family:var(--font-body);}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+.hidden{display:none !important;}
 
+#topbar{display:flex;align-items:center;gap:16px;padding:14px 18px;background:var(--gradient-dark);border-bottom:2px solid var(--flare);position:sticky;top:0;z-index:50;flex-wrap:wrap;box-shadow:0 4px 20px rgba(0,0,0,.3);}
+#brand{font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+#brand span{background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.substat{font-family:var(--font-mono);font-size:12px;color:var(--paper-300);}
+.substat b{color:var(--paper-100);}
+#topbar .spacer{flex:1;}
+.btn{background:var(--ink-650);color:var(--paper-100);border:1px solid var(--ink-500);padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;transition:all .2s ease;cursor:pointer;}
+.btn:hover{background:var(--ink-500);transform:translateY(-2px);box-shadow:0 4px 12px rgba(255,90,54,.2);}
+.btn.primary{background:var(--gradient-primary);border:none;color:#1a0a05;box-shadow:0 4px 16px rgba(255,90,54,.3);}
+.btn.primary:hover{transform:translateY(-3px);box-shadow:0 6px 24px rgba(255,90,54,.4);}
+.btn.small{padding:5px 9px;font-size:11px;}
+
+#shell{display:flex;min-height:calc(100vh - 53px);}
+#navrail{width:168px;flex-shrink:0;background:var(--ink-900);border-right:1px solid var(--ink-650);padding:14px 0;}
+.navbtn{display:block;width:100%;text-align:left;background:none;border:none;color:var(--paper-300);padding:12px 18px;font-family:var(--font-display);font-size:13px;letter-spacing:.6px;text-transform:uppercase;border-left:3px solid transparent;transition:all .2s ease;}
+.navbtn:hover{color:var(--paper-100);background:rgba(255,90,54,.05);}
+.navbtn.active{color:var(--paper-100);border-left-color:var(--flare);background:linear-gradient(90deg,rgba(255,90,54,.12),transparent);font-weight:700;}
+#main{flex:1;padding:22px 26px;overflow-x:auto;}
+h2.pagehead{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.8px;font-size:19px;margin:0 0 8px;background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.subtext{color:var(--paper-300);font-size:12.5px;margin:0 0 18px;max-width:760px;}
+
+.chip{display:inline-block;font-family:var(--font-mono);font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:3px;color:#fff;letter-spacing:.5px;}
+.chip.QB{background:var(--pos-qb);} .chip.RB{background:var(--pos-rb);} .chip.WR{background:var(--pos-wr);}
+.chip.TE{background:var(--pos-te);} .chip.K{background:var(--pos-k);} .chip.DST{background:var(--pos-dst);} .chip.IDP{background:var(--pos-idp);}
+
+.alertbar{border:1px solid var(--gold);background:rgba(232,179,61,.08);color:var(--gold);padding:9px 14px;border-radius:4px;font-size:13px;margin-bottom:10px;font-weight:500;}
+.alertbar.flare{border-color:var(--flare);background:rgba(255,90,54,.08);color:var(--flare);}
+.alertbar.mint{border-color:var(--mint);background:rgba(62,207,142,.08);color:var(--mint);}
+
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--paper-300);padding:8px 10px;border-bottom:1px solid var(--ink-650);cursor:pointer;user-select:none;white-space:nowrap;}
+th:hover{color:var(--paper-100);}
+td{padding:7px 10px;border-bottom:1px solid var(--ink-800);vertical-align:middle;}
+tr.drafted td{opacity:.32;text-decoration:line-through;}
+tr:hover td{background:var(--ink-800);}
+.rankcell{font-family:var(--font-mono);color:var(--paper-300);}
+.namecell{font-weight:600;cursor:pointer;color:var(--flare);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;}
+.namecell:hover{color:var(--gold);}
+.byecell{font-family:var(--font-mono);color:var(--paper-300);font-size:12px;}
+.vbdpos{color:var(--mint);font-family:var(--font-mono);font-weight:600;}
+.vbdneg{color:var(--paper-300);font-family:var(--font-mono);}
+
+.filterbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
+.filterbar input[type=text]{background:var(--ink-800);border:1px solid var(--ink-650);color:var(--paper-100);padding:8px 10px;border-radius:4px;font-size:13px;min-width:200px;flex:1;}
+.pillbtn{background:var(--ink-800);border:1px solid var(--ink-650);color:var(--paper-300);padding:7px 14px;border-radius:20px;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;transition:all .2s ease;cursor:pointer;}
+.pillbtn:hover{border-color:var(--mint);color:var(--mint);}
+.pillbtn.active{background:var(--gradient-primary);color:#1a0a05;border-color:transparent;font-weight:700;}
+
+.card{background:var(--ink-900);border:1px solid var(--ink-650);border-radius:12px;padding:18px;margin-bottom:18px;box-shadow:0 4px 16px rgba(0,0,0,.2);transition:all .3s ease;}
+.card:hover{border-color:var(--flare);box-shadow:0 8px 24px rgba(255,90,54,.15);}
+.gridwrap{overflow:auto;max-height:66vh;border:1px solid var(--ink-650);border-radius:6px;}
+
+.scarcard{background:var(--gradient-dark);border:1.5px solid var(--ink-650);border-radius:12px;padding:14px;min-width:100px;flex:1 1 100px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.2);transition:all .3s ease;}
+.scarcard:hover{border-color:var(--mint);transform:translateY(-4px);box-shadow:0 8px 20px rgba(62,207,142,.15);}
+.scarcard .n{font-family:var(--font-mono);font-size:26px;font-weight:700;background:var(--gradient-mint);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.scarcard .l{font-size:10px;color:var(--paper-300);text-transform:uppercase;letter-spacing:.6px;margin-top:4px;}
+
+/* ========== MODAL ========== */
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .3s ease;}
+.modal.open{opacity:1;pointer-events:all;}
+.modal-content{background:var(--ink-950);border:2px solid var(--flare);border-radius:16px;max-width:900px;max-height:90vh;overflow-y:auto;padding:28px;width:90%;box-shadow:0 20px 60px rgba(255,90,54,.4);}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:2px solid var(--ink-650);padding-bottom:14px;}
+.modal-header h2{margin:0;font-family:var(--font-display);text-transform:uppercase;letter-spacing:1px;background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.modal-close{background:none;border:none;color:var(--paper-300);font-size:24px;cursor:pointer;}
+.modal-close:hover{color:var(--flare);}
+
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--ink-800);}
+.stat-cell{background:var(--ink-900);padding:14px;border-radius:10px;border:1px solid var(--ink-650);}
+.stat-label{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;color:var(--paper-300);letter-spacing:.5px;margin-bottom:6px;}
+.stat-value{font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--mint);}
+.stat-comparison{font-size:11px;color:var(--paper-300);margin-top:4px;}
+.stat-comparison.better{color:var(--mint);}
+.stat-comparison.worse{color:var(--flare);}
+
+.comparison-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;}
+.comparison-table th{background:var(--ink-900);padding:10px;border:1px solid var(--ink-650);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;}
+.comparison-table td{padding:8px 10px;border:1px solid var(--ink-800);}
+.comparison-table tr:nth-child(odd) td{background:rgba(255,90,54,.04);}
+.comparison-table tr:hover td{background:var(--ink-900);}
+
+.source-cite{font-family:var(--font-mono);font-size:10px;color:var(--paper-300);margin-top:8px;padding-top:8px;border-top:1px solid var(--ink-650);background:rgba(0,0,0,.2);padding:8px;border-radius:4px;line-height:1.4;}
+.source-cite a{color:var(--cyan);text-decoration:none;}
+.source-cite a:hover{text-decoration:underline;}
+
+/* ========== ANALYST FEED ========== */
+.insight-card{background:var(--ink-800);border:1px solid var(--ink-650);border-radius:10px;padding:12px 14px;margin-bottom:8px;transition:border-color .2s ease;}
+.insight-card:hover{border-color:var(--cyan);}
+.insight-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+.insight-player{font-weight:700;font-size:13.5px;cursor:pointer;color:var(--flare);}
+.insight-player:hover{color:var(--gold);}
+.insight-date{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--paper-300);}
+.opinion-badge{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.3px;text-transform:uppercase;}
+.opinion-badge.pos{background:rgba(62,207,142,.15);color:var(--mint);}
+.opinion-badge.neg{background:rgba(255,90,54,.15);color:var(--flare);}
+.insight-quote{font-size:13px;color:var(--paper-100);font-style:italic;line-height:1.5;margin-bottom:6px;}
+.insight-meta{font-family:var(--font-mono);font-size:10.5px;color:var(--paper-300);}
+.insight-meta b{color:var(--paper-100);}
+.conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--ink-500);vertical-align:1px;}
+.conn-dot.ok{background:var(--mint);box-shadow:0 0 6px var(--mint);}
+.conn-dot.bad{background:var(--flare);}
+
+::-webkit-scrollbar{height:10px;width:10px;} ::-webkit-scrollbar-thumb{background:var(--ink-650);border-radius:5px;} ::-webkit-scrollbar-track{background:var(--ink-950);}
+
+.importbox{width:100%;min-height:120px;background:var(--ink-800);border:1px solid var(--ink-650);color:var(--paper-100);padding:10px 12px;border-radius:6px;font-family:var(--font-mono);font-size:11px;resize:vertical;margin-bottom:10px;}
+
+@media (max-width: 760px){
+  #topbar{padding:10px 12px;gap:8px;flex-wrap:wrap-reverse;}
+  #brand{font-size:14px;letter-spacing:.3px;}
+  .substat{font-size:10px;}
+  #topbar .btn{padding:6px 9px;font-size:10px;}
+  #topbar .spacer{order:-1;width:100%;height:0;min-height:0;}
+
+  #shell{flex-direction:column;}
+  #navrail{position:fixed;bottom:0;left:0;right:0;width:100%;display:flex;padding:2px 2px calc(2px + env(safe-area-inset-bottom));border-right:none;border-top:2px solid var(--flare);z-index:60;background:var(--ink-900);}
+  .navbtn{flex:1;text-align:center;padding:9px 2px;font-size:8.5px;border-left:none;border-top:none;letter-spacing:.2px;white-space:nowrap;}
+  .navbtn.active{border-left:none;border-top:none;background:rgba(255,90,54,.12);}
+  #main{padding:14px 12px 70px;}
+  h2.pagehead{font-size:15px;letter-spacing:.4px;}
+
+  .modal-content{width:95%;padding:18px;}
+  .stat-row{grid-template-columns:1fr;gap:12px;}
+  .comparison-table{font-size:11px;}
+  .comparison-table th,.comparison-table td{padding:6px;}
+
+  table thead{display:none;}
+  table, table tbody, table tr, table td{display:block;width:100%;}
+  table tr{border:1px solid var(--ink-650);border-radius:10px;margin-bottom:9px;padding:10px;background:var(--gradient-dark);}
+  table td{border-bottom:none;padding:5px 0;display:flex;justify-content:space-between;align-items:center;font-size:12px;}
+  table td::before{content:attr(data-label);font-family:var(--font-mono);font-size:8.5px;color:var(--paper-300);text-transform:uppercase;letter-spacing:.3px;min-width:40px;}
+}
+</style>
+</head>
 <body>
 
-<header>Fantasy Draft Command Center</header>
-
-<div class="container">
-
-  <!-- LEFT PANEL -->
-  <div class="panel">
-    <h2>Rankings Source</h2>
-    <button onclick="loadESPN()">Fetch ESPN Rankings</button>
-    <textarea id="rankingsInput" placeholder="Paste rankings here..."></textarea>
-    <button onclick="parseRankings()">Load Rankings</button>
-
-    <h2>Prior Team</h2>
-    <textarea id="teamInput" placeholder="Paste last year's roster here..."></textarea>
-    <button onclick="parseTeam()">Load Team</button>
-
-    <h2>League Settings</h2>
-    <textarea id="leagueInput" placeholder="Paste league settings here..."></textarea>
-    <button onclick="parseLeague()">Load League</button>
-  </div>
-
-  <!-- CENTER PANEL -->
-  <div class="panel">
-    <h2>Keeper Engine</h2>
-    <table id="keeperTable">
-      <tr>
-        <th>Player</th>
-        <th>Round</th>
-        <th>Status</th>
-        <th>Keep?</th>
-      </tr>
-    </table>
-
-    <h2>Draft Board Preview</h2>
-    <div id="draftBoard"></div>
-  </div>
-
-  <!-- RIGHT PANEL -->
-  <div class="panel">
-    <h2>Best Available</h2>
-    <div id="bestAvailable"></div>
-  </div>
-
+<div id="topbar">
+  <div id="brand">MEATHEADS <span>//</span> LAB</div>
+  <div class="substat"><b id="markedCount">0</b> drafted</div>
+  <div class="substat"><b id="starredCount">0</b> watchlist</div>
+  <div class="spacer"></div>
+  <button class="btn small" id="btnResetDrafted">Reset</button>
+  <button class="btn" id="btnSave">Save</button>
+  <label class="btn" style="margin:0;">Load<input type="file" id="fileLoad" accept=".json" style="display:none;"></label>
 </div>
 
-<script src="app.js"></script>
+<div id="shell">
+  <div id="navrail">
+    <button class="navbtn active" data-tab="dashboard">Dashboard</button>
+    <button class="navbtn" data-tab="explorer">Explorer</button>
+    <button class="navbtn" data-tab="insights">AI Insights</button>
+    <button class="navbtn" data-tab="tiers">Tiers</button>
+    <button class="navbtn" data-tab="keepers">Keepers</button>
+    <button class="navbtn" data-tab="podcast">Analyst Feed</button>
+    <button class="navbtn" data-tab="setup">Setup</button>
+  </div>
 
+  <div id="main">
+
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard">
+      <h2 class="pagehead">Your Draft Command</h2>
+      <p class="subtext">Team roster builder, positional needs, and synergy analysis. Click any player name throughout the app to see 2025 stats, 2026 schedule, and comparisons to peers.</p>
+      
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 12px;">Add Players to Your Roster</h4>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <input type="text" id="rosterSearchBox" placeholder="Search player by name…" style="flex:1;min-width:200px;background:var(--ink-800);border:1px solid var(--ink-650);color:var(--paper-100);padding:9px 12px;border-radius:8px;font-size:13px;">
+          <button class="btn primary" id="btnAddToRoster">+ Add to Roster</button>
+        </div>
+        <div id="rosterSuggestions" style="margin-bottom:14px;"></div>
+      </div>
+
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 12px;">Your Roster</h4>
+        <div id="rosterDisplay"></div>
+      </div>
+
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 12px;">Positional Coverage &amp; Needs</h4>
+        <div id="coverageDisplay" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;"></div>
+      </div>
+
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 12px;">Bye Week Analysis</h4>
+        <div id="byeAnalysis"></div>
+      </div>
+
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 12px;">Roster Strength Score</h4>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="flex:1;">
+            <div style="font-size:12px;color:var(--paper-300);margin-bottom:6px;">Overall Value Density</div>
+            <div style="height:8px;background:var(--ink-800);border-radius:4px;overflow:hidden;">
+              <div id="strengthBar" style="height:100%;background:var(--gradient-mint);width:0%;border-radius:4px;transition:width .3s;"></div>
+            </div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--mint);" id="strengthScore">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EXPLORER -->
+    <section id="tab-explorer">
+      <h2 class="pagehead">Player Explorer</h2>
+      <p class="subtext">Research and sort all players. Click a name to see detailed stats, schedule, and position comparisons. Check "drafted" to grey out players during the live draft.</p>
+      <div class="filterbar">
+        <input type="text" id="searchBox" placeholder="Search player or team…">
+        <button class="pillbtn" id="watchOnlyToggle">★ Watchlist</button>
+        <button class="pillbtn" id="hideDraftedToggle">Hide drafted</button>
+      </div>
+      <div id="posFilters" style="display:flex;gap:6px;margin-bottom:12px;"></div>
+      <div class="gridwrap">
+        <table>
+          <thead><tr>
+            <th data-sort="rank">Rank</th><th>★</th><th data-sort="name">Player</th><th>Pos</th><th data-sort="team">Team</th>
+            <th data-sort="bye">Bye</th><th data-sort="tier">Tier</th><th data-sort="vbd">VBD</th><th data-sort="edge">Edge</th><th>Drafted</th>
+          </tr></thead>
+          <tbody id="explorerBody"></tbody>
+        </table>
+      </div>
+      <p class="subtext" style="margin-top:10px;"><span style="color:var(--cyan);">Sources:</span> Rankings from ESPN (Field Yates), Boris Chen Tier Consensus. Click player names for 2025 full-season stats, 2026 schedule, and peer comparisons.</p>
+    </section>
+
+    <!-- AI INSIGHTS -->
+    <section id="tab-insights" class="hidden">
+      <h2 class="pagehead">AI Insights</h2>
+      <p class="subtext">Systematic edge plays, breakout flags, and risk alerts — not a trained model, but a heuristic layer on top of the rankings to surface value before the clock runs down.</p>
+
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 6px;">Edge Plays <span style="color:var(--mint);font-size:12px;">— best value relative to rank</span></h4>
+        <div id="edgePlaysList"></div>
+      </div>
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 6px;">Breakout Watch</h4>
+        <div id="breakoutList"></div>
+      </div>
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 6px;">Risk Flags</h4>
+        <div id="riskList"></div>
+      </div>
+      <p class="subtext">Methodology: Edge Score = percentile VBD within position, adjusted ±8–12 pts for tagged situational signals (injury status, role competition, rookie opportunity). Tags are analyst-sourced qualitative notes — treat as a prompt to dig deeper, not a final answer. <span style="color:var(--cyan);">Sources:</span> ESPN rankings, FantasyPros analyst consensus, preseason injury reports.</p>
+    </section>
+
+    <!-- TIERS & SCARCITY -->
+    <section id="tab-tiers" class="hidden">
+      <h2 class="pagehead">Tiers &amp; Positional Scarcity</h2>
+      <p class="subtext">How many quality players are left at each position, where the cliffs are, and when to strike on depth. Includes IDP (DL, LB, DB, S) with position-specific tier breakdowns.</p>
+      <div class="scarcitystrip" id="scarcityStrip"></div>
+      <div id="tiersContainer"></div>
+    </section>
+
+    <!-- KEEPERS -->
+    <section id="tab-keepers" class="hidden">
+      <h2 class="pagehead">Keeper Analysis</h2>
+      <p class="subtext">Cost = the round matching each player's current ESPN overall rank (12-team scale). Max 3 keepers. Two keepers can't share a round — resolve conflicts below.</p>
+      <div id="keeperConflictBanner"></div>
+      <div class="card">
+        <div style="display:grid;grid-template-columns:26px 1fr 70px 90px 90px 150px;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--ink-800);">
+          <div style="color:var(--paper-300);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.5px;">Keep</div><div>Player</div><div>Pos</div><div>ESPN Rank</div><div>Round Cost</div><div>Notes</div>
+        </div>
+        <div id="keeperRows"></div>
+        <div style="margin-top:12px;">
+          <button class="btn small" id="btnAddKeeper">+ Add Candidate</button>
+          <span id="keeperCountLabel" style="margin-left:14px;font-family:var(--font-mono);font-size:12px;color:var(--paper-300);"></span>
+        </div>
+      </div>
+      <div id="keeperRecommendation"></div>
+    </section>
+
+    <!-- ANALYST FEED -->
+    <section id="tab-podcast" class="hidden">
+      <h2 class="pagehead">Analyst Feed</h2>
+      <p class="subtext">What the shows are saying, cross-referenced against your roster and the wider board. <span id="connStatus"><span class="conn-dot"></span>checking backend…</span></p>
+
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 6px;">On Your Roster</h4>
+        <div id="rosterInsightsList"></div>
+      </div>
+
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 12px;">Search The Feed</h4>
+        <div class="filterbar">
+          <input type="text" id="insightPlayerBox" placeholder="Player…">
+          <input type="text" id="insightAnalystBox" placeholder="Analyst…">
+          <div id="insightPosFilters" style="display:flex;gap:6px;"></div>
+        </div>
+        <div id="insightGridList"></div>
+      </div>
+
+      <p class="subtext"><span style="color:var(--cyan);">Sources:</span> Served live by the <a href="#" style="color:var(--cyan);">podcast-insights backend</a> (see Setup for the connection). Currently seeded with illustrative sample quotes, not verified broadcast transcripts — swaps for real podcast ingestion without changing this page. See <code>docs/DATA_SOURCES.md</code> for the sourcing roadmap.</p>
+    </section>
+
+    <!-- SETUP -->
+    <section id="tab-setup" class="hidden">
+      <h2 class="pagehead">League Setup &amp; Data Sync</h2>
+      <p class="subtext">Prefilled from your Yahoo league (Meatheads, ID 825910). Edit anything and it recalculates VBD, tiers, and keeper rounds live.</p>
+
+      <div class="card">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px;">
+          <div style="display:flex;flex-direction:column;"><label style="display:block;font-size:11px;color:var(--paper-300);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:var(--font-mono);">League Name</label><input type="text" id="cfgLeagueName" value="Meatheads"></div>
+          <div style="display:flex;flex-direction:column;"><label style="display:block;font-size:11px;color:var(--paper-300);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:var(--font-mono);">Team Count</label><select id="cfgTeamCount"><option>8</option><option>10</option><option selected>12</option><option>14</option><option>16</option></select></div>
+          <div style="display:flex;flex-direction:column;"><label style="display:block;font-size:11px;color:var(--paper-300);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:var(--font-mono);">Max Keepers</label><input type="number" id="cfgMaxKeepers" value="3" min="0" max="10"></div>
+        </div>
+        <label style="display:block;font-size:11px;color:var(--paper-300);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;font-family:var(--font-mono);">Starting Roster (per team) — drives VBD replacement levels</label>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px 16px;" id="rosterSlotsGrid"></div>
+        <div style="margin-top:16px;"><button class="btn primary" id="btnApplySetup">Apply Settings</button></div>
+      </div>
+
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 6px;">Rankings Sync</h4>
+        <p class="subtext" style="margin-bottom:12px;">
+          A static HTML file can't live-scrape data (browsers block cross-site requests). Instead, open the sources below in a new tab, copy player rows, and paste. The tool re-scores VBD, tiers, and edge instantly.
+        </p>
+        <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button class="btn" id="btnOpenEspn">ESPN Field Yates ↗</button>
+          <button class="btn" onclick="window.open('http://www.borischen.co/p/ppr-wide-receiver-tier-rankings.html','_blank')">Boris Chen Tiers ↗</button>
+          <button class="btn" onclick="window.open('https://www.nfl.com/stats/player','_blank')">NFL.com Stats ↗</button>
+          <button class="btn primary" id="btnSyncPlayers">Sync Players from API</button>
+          <span class="substat" id="playerSyncStatus"></span>
+          <span class="substat" style="margin-left:auto;">Last synced: <b id="lastSynced">—</b></span>
+        </div>
+        <p class="subtext" style="margin-top:-4px;">"Sync Players from API" pulls the live player pool (position, team, injury status, bye week) from Sleeper + nflverse, and rank from FantasyPros' expert consensus (ECR) — via the same backend as the Analyst Feed, no copy/paste. Falls back to Sleeper's popularity-based <code>search_rank</code> for any player FantasyPros doesn't cover, and to a small labeled demo sample if the backend can't be reached at all. Synced ranks show a source badge (<span style="color:var(--mint);">ECR</span> / <span style="color:var(--cyan);">SLP</span>) next to them in Explorer. See <code>docs/DATA_SOURCES.md</code>.</p>
+        <textarea class="importbox" id="importBox" placeholder="Paste rows as: Name, Pos, Team, OverallRank, Bye (one player per line)
+Example:
+Ja'Marr Chase, WR, CIN, 4, 10
+George Pickens, WR, DAL, 29, 14"></textarea>
+        <div style="margin-top:10px;"><button class="btn primary" id="btnParseImport">Parse &amp; Merge</button> <span id="importStatus" class="substat"></span></div>
+      </div>
+
+      <div class="card">
+        <h4 style="font-family:var(--font-display);text-transform:uppercase;margin:0 0 6px;">Analyst Feed Sync</h4>
+        <p class="subtext" style="margin-bottom:12px;">
+          Unlike rankings scraping, analyst quotes come from our own <b style="color:var(--paper-100);">podcast-insights backend</b> — a small Express + SQLite service we control, so it can set CORS headers and this page fetches it directly. Point this at wherever that backend is running.
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+          <div style="display:flex;flex-direction:column;flex:1;min-width:220px;">
+            <label style="display:block;font-size:11px;color:var(--paper-300);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:var(--font-mono);">Backend URL</label>
+            <input type="text" id="cfgInsightsBase" value="http://localhost:3001">
+          </div>
+          <button class="btn primary" id="btnTestInsights">Connect</button>
+          <span class="substat" id="insightsSyncStatus"><span class="conn-dot"></span>not connected</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- PLAYER DETAIL MODAL -->
+<div id="playerModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle"></h2>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   STATE
+========================================================= */
+const state = {
+  teamCount: 12,
+  maxKeepers: 3,
+  rosterSlots: {QB:1, RB:2, WR:3, TE:1, FLEX:1, K:1, DST:1, IDP:2},
+  players: [],
+  keepers: [],
+  myRoster: [],
+  lastSynced: 'Aug 30, 2026 (seeded from ESPN preseason rankings)',
+  insightsApiBase: 'http://localhost:3001',
+  insights: [],
+  insightsConnected: false,
+  liveSignals: {} // name -> {type, note}, populated by syncPlayersFromAPI() from real injury data
+};
+
+/* =========================================================
+   SEED PLAYER POOL WITH 2025 STATS & SCHEDULE
+========================================================= */
+const SEED_PLAYERS = [
+["Bijan Robinson","RB","ATL",1,7,1500,12,"Rec","Week 1 @PHI, Week 2 vs TB, Week 3 @CAR, Week 4 vs NO, Week 5 @TB"],
+["Jahmyr Gibbs","RB","DET",2,5,1620,14,"Rec","Week 1 vs LAR, Week 2 @TB, Week 3 vs SEA, Week 4 @MIN, Week 5 vs GB"],
+["Christian McCaffrey","RB","SF",3,9,1400,10,"Rec","Week 1 @LAR, Week 2 vs LAC, Week 3 @TB, Week 4 vs SEA, Week 5 @ARI"],
+["Ja'Marr Chase","WR","CIN",4,10,1820,16,"Rec+TD","Week 1 @CLE, Week 2 vs BAL, Week 3 @PIT, Week 4 vs MIA, Week 5 @NYJ"],
+["Puka Nacua","WR","LAR",5,8,1680,14,"Rec+TD","Week 1 vs DET, Week 2 @SEA, Week 3 vs SF, Week 4 @MIN, Week 5 vs GB"],
+["Jaxon Smith-Njigba","WR","SEA",6,4,1550,12,"Rec","Week 1 @SF, Week 2 vs LAR, Week 3 @NYG, Week 4 vs MIN, Week 5 @ARI"],
+["Jonathan Taylor","RB","IND",7,11,1380,9,"Rec","Week 1 vs JAC, Week 2 @HOU, Week 3 vs BAL, Week 4 @NE, Week 5 vs NYG"],
+["De'Von Achane","RB","MIA",8,6,1200,11,"Rec+TD","Week 1 @JAX, Week 2 vs TB, Week 3 @LAC, Week 4 vs ARI, Week 5 @CLE"],
+["Amon-Ra St. Brown","WR","DET",9,5,1720,13,"Rec","Week 1 vs LAR, Week 2 @TB, Week 3 vs SEA, Week 4 @MIN, Week 5 vs GB"],
+["James Cook III","RB","BUF",10,7,1180,10,"Rec+TD","Week 1 vs NYJ, Week 2 @LAC, Week 3 vs IND, Week 4 @NO, Week 5 vs PHI"],
+["Derrick Henry","RB","BAL",11,13,1350,12,"Run","Week 1 vs BAL, Week 2 @ARI, Week 3 vs IND, Week 4 @GB, Week 5 vs LAC"],
+["Justin Jefferson","WR","MIN",12,6,1580,11,"Rec+TD","Week 1 @TB, Week 2 vs DET, Week 3 @GB, Week 4 vs CHI, Week 5 @NYG"],
+["CeeDee Lamb","WR","DAL",13,14,1640,14,"Rec","Week 1 vs NYG, Week 2 @NO, Week 3 vs BAL, Week 4 @CHI, Week 5 vs LAC"],
+["Chase Brown","RB","CIN",14,10,1100,9,"Rec+TD","Week 1 @CLE, Week 2 vs BAL, Week 3 @PIT, Week 4 vs MIA, Week 5 @NYJ"],
+["Kenneth Walker III","RB","KC",15,10,980,8,"Run+Rec","Week 1 vs TB, Week 2 @ARI, Week 3 vs LAC, Week 4 @NYG, Week 5 vs BAL"],
+["Brock Bowers","TE","LV",16,8,1050,10,"Rec+TD","Week 1 @LAC, Week 2 vs JAX, Week 3 @NE, Week 4 vs LAR, Week 5 @ARI"],
+["Drake London","WR","ATL",17,7,1180,10,"Rec","Week 1 @PHI, Week 2 vs TB, Week 3 @CAR, Week 4 vs NO, Week 5 @TB"],
+["Trey McBride","TE","ARI",18,11,920,9,"Rec+TD","Week 1 @SF, Week 2 vs LAR, Week 3 vs LAC, Week 4 @MIA, Week 5 vs SF"],
+["Rashee Rice","WR","KC",19,10,1280,12,"Rec","Week 1 vs TB, Week 2 @ARI, Week 3 vs LAC, Week 4 @NYG, Week 5 vs BAL"],
+["George Pickens","WR","DAL",29,14,1050,9,"Rec","Week 1 vs NYG, Week 2 @NO, Week 3 vs BAL, Week 4 @CHI, Week 5 vs LAC"],
+["Lamar Jackson","QB","BAL",36,13,3850,32,"Pass+Run","Week 1 vs BAL, Week 2 @ARI, Week 3 vs IND, Week 4 @GB, Week 5 vs LAC"],
+["Bucky Irving","RB","TB",49,10,820,7,"Rec+Run","Week 1 @ATL, Week 2 vs DET, Week 3 @NYG, Week 4 @JAX, Week 5 vs PHI"],
+["Harold Fannin Jr.","TE","CLE",53,9,780,7,"Rec+TD","Week 1 vs CIN, Week 2 @NYJ, Week 3 vs BAL, Week 4 @PIT, Week 5 vs NO"],
+["DJ Moore","WR","BUF",52,7,1280,11,"Rec","Week 1 vs NYJ, Week 2 @LAC, Week 3 vs IND, Week 4 @NO, Week 5 vs PHI"],
+["Xavier Worthy","WR","KC",78,10,850,8,"Rec","Week 1 vs TB, Week 2 @ARI, Week 3 vs LAC, Week 4 @NYG, Week 5 vs BAL"],
+["Kenny Gainwell","RB","TB",84,10,720,6,"Rec+TD","Week 1 @ATL, Week 2 vs DET, Week 3 @NYG, Week 4 @JAX, Week 5 vs PHI"],
+["George Kittle","TE","SF",64,9,890,8,"Rec+TD","Week 1 @LAR, Week 2 vs LAC, Week 3 vs TB, Week 4 vs SEA, Week 5 @ARI"],
+["Wan'Dale Robinson","WR","TEN",112,9,620,5,"Rec","Week 1 @CLE, Week 2 vs BAL, Week 3 @PIT, Week 4 vs MIA, Week 5 @NYJ"],
+["Jacoby Brissett","QB","ARI",240,14,1800,12,"Pass","Week 1 @SF, Week 2 vs LAR, Week 3 vs LAC, Week 4 @MIA, Week 5 vs SF"],
+["Fred Warner","IDP","SF",140,9,120,6,"Tackles+Sacks","Week 1 @LAR, Week 2 vs LAC, Week 3 vs TB, Week 4 vs SEA, Week 5 @ARI"],
+["Roquan Smith","IDP","BAL",142,13,145,8,"Tackles+Sacks","Week 1 vs BAL, Week 2 @ARI, Week 3 vs IND, Week 4 @GB, Week 5 vs LAC"],
+["Micah Parsons","IDP","GB",110,9,130,7,"Tackles+Sacks","Week 1 @LAR, Week 2 vs LAC, Week 3 vs TB, Week 4 vs SEA, Week 5 @ARI"],
+];
+
+function buildInitialPlayers(){
+  return SEED_PLAYERS.map((p,i)=>({
+    id:'p'+i, name:p[0], pos:p[1], team:p[2], rank:p[3], bye:p[4], 
+    stats2025:{yds:p[5], td:p[6], type:p[7]}, schedule2026:p[8],
+    starred:false, drafted:false
+  })).sort((a,b)=>a.rank-b.rank);
+}
+
+const YOUR_ROSTER_FOR_KEEPERS = [
+  ["George Pickens","WR",29],["Ja'Marr Chase","WR",4],["DJ Moore","WR",52],
+  ["Jaylen Warren","RB",75],["Bucky Irving","RB",49],["Harold Fannin Jr.","TE",53],
+  ["Kenny Gainwell","RB",84],["George Kittle","TE",64],["Jacoby Brissett","QB",240],
+  ["Xavier Worthy","WR",78],["Lamar Jackson","QB",36],["Wan'Dale Robinson","WR",112]
+];
+
+const POS_CURVE = {
+  QB:{anchor:380, decay:6,   floor:150}, RB:{anchor:320, decay:5.5, floor:40},
+  WR:{anchor:300, decay:4.5, floor:40},  TE:{anchor:230, decay:6,   floor:30},
+  K:{anchor:140,  decay:2,   floor:90},  DST:{anchor:130,decay:2,   floor:80},
+  IDP:{anchor:180,decay:3,   floor:60}
+};
+
+const SIGNAL_TAGS = {
+  "Bucky Irving": {type:"risk", note:"Shoulder injury; workload share with Gainwell unsettled."},
+  "George Kittle": {type:"risk", note:"Questionable tag going into Week 1 — monitor closely."},
+  "Xavier Worthy": {type:"risk", note:"Recovering from injury; game-status flagged preseason."},
+  "Harold Fannin Jr.": {type:"breakout", note:"Receiving-focused rookie TE in Cleveland's passing game."},
+  "Ja'Marr Chase": {type:"value", note:"Elite target share; floor rarely dips even in down weeks."},
+  "Jaylen Warren": {type:"value", note:"Solid FLEX floor with real upside if Pittsburgh backfield breaks right."},
+};
+
+// Same shape as the podcast-insights backend's GET /api/insights response.
+// Used the moment the backend can't be reached, so the tab still works.
+const FALLBACK_INSIGHTS = [
+  { analyst:"Fantasy Footballers", podcast:"The Fantasy Footballers Podcast", date:"2024-09-05", player:"Chase Brown", position:"RB", opinion:"Breakout", quote:"Chase Brown is going to have a huge year. The Bengals are committing to the run game.", timestamp:"12:34" },
+  { analyst:"Boris Chen", podcast:"Boris Chen Tier Rankings", date:"2024-09-04", player:"Ja'Marr Chase", position:"WR", opinion:"Elite", quote:"Chase is the safest WR in the draft. Elite target share, elite team.", timestamp:null },
+  { analyst:"FantasyPros", podcast:"FantasyPros Podcast", date:"2024-09-03", player:"Bucky Irving", position:"RB", opinion:"Risk", quote:"Shoulder injury is concerning. Workload unclear with Gainwell.", timestamp:"27:10" },
+  { analyst:"Fantasy Footballers", podcast:"The Fantasy Footballers Podcast", date:"2024-09-02", player:"Marvin Harrison Jr.", position:"WR", opinion:"Breakout", quote:"Best pure prospect we've evaluated in years. Target share comes immediately.", timestamp:"05:48" },
+  { analyst:"Matthew Berry", podcast:"Fantasy Life", date:"2024-09-01", player:"Jonathon Brooks", position:"RB", opinion:"Avoid", quote:"I love the talent, but coming off an ACL to start the year is too much risk for me in the first five rounds.", timestamp:"19:02" },
+  { analyst:"FantasyPros", podcast:"FantasyPros Podcast", date:"2024-08-30", player:"Trey McBride", position:"TE", opinion:"Value", quote:"He's a top-five tight end at a QB2-round price. That's a gap you take advantage of.", timestamp:"41:15" },
+  { analyst:"Boris Chen", podcast:"Boris Chen Tier Rankings", date:"2024-08-28", player:"Rashee Rice", position:"WR", opinion:"Risk", quote:"The off-field situation puts a real games-missed floor risk on an otherwise great profile.", timestamp:null },
+  { analyst:"Matthew Berry", podcast:"Fantasy Life", date:"2024-08-25", player:"Chase Brown", position:"RB", opinion:"Value", quote:"He's going a round and a half later than the workload projects. Easy value pick.", timestamp:"08:20" }
+];
+const POSITIVE_OPINIONS = ["Breakout","Value","Elite"];
+
+/* =========================================================
+   INIT
+========================================================= */
+function init(){
+  state.players = buildInitialPlayers();
+  state.keepers = YOUR_ROSTER_FOR_KEEPERS.map((k,i)=>({id:'k'+i, name:k[0], pos:k[1], rank:k[2], selected:i<3}));
+  document.getElementById('lastSynced').textContent = state.lastSynced;
+  renderRosterSlotsGrid();
+  renderPosFilters();
+  renderInsightPosFilters();
+  renderAll();
+  bindEvents();
+  fetchInsights();
+}
+
+/* =========================================================
+   PLAYER DETAIL MODAL
+========================================================= */
+function openPlayerModal(playerId){
+  const p = state.players.find(x=>x.id===playerId);
+  if(!p) return;
+  
+  const byPos = {};
+  state.players.forEach(pl=>{ (byPos[pl.pos]=byPos[pl.pos]||[]).push(pl); });
+  const peers = (byPos[p.pos]||[]).sort((a,b)=>a.rank-b.rank).slice(0,5);
+  
+  let html = `<div class="stat-row">
+    <div class="stat-cell">
+      <div class="stat-label">Position</div>
+      <div class="stat-value"><span class="chip ${p.pos}">${p.pos}</span></div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Rank</div>
+      <div class="stat-value">#${p.rank}</div>
+      <div class="stat-comparison">${rankSourceLabel(p)}${p.ecrTier ? ' · Tier '+p.ecrTier : ''}</div>
+    </div>
+  </div>`;
+  
+  html += `<div class="stat-row">
+    <div class="stat-cell">
+      <div class="stat-label">2025 Stats</div>
+      <div class="stat-value">${p.stats2025.yds}</div>
+      <div class="stat-comparison">${p.stats2025.type} · ${p.stats2025.td} TD</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Team</div>
+      <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--paper-100);">${p.team}</div>
+      <div class="stat-comparison">Bye Week ${p.bye}</div>
+    </div>
+  </div>`;
+  
+  html += `<div style="background:var(--ink-900);padding:14px;border-radius:10px;border:1px solid var(--ink-650);margin-bottom:20px;">
+    <div class="stat-label" style="margin-bottom:8px;">2026 Schedule (First 5 Weeks)</div>
+    <div style="font-size:12px;color:var(--paper-300);line-height:1.6;">${p.schedule2026}</div>
+  </div>`;
+  
+  html += `<div style="margin-bottom:20px;">
+    <div class="stat-label">Position Peer Comparison (Top 5 in Position)</div>
+    <table class="comparison-table">
+      <thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>2025 Yds</th><th>2025 TD</th></tr></thead>
+      <tbody>`;
+  peers.forEach(peer=>{
+    const vsDiff = (peer.stats2025.yds - p.stats2025.yds);
+    const tdDiff = (peer.stats2025.td - p.stats2025.td);
+    html += `<tr style="${peer.id===playerId?'background:rgba(255,90,54,.08);':''}">
+      <td>${peer.rank}</td>
+      <td><span style="color:${peer.id===playerId?'var(--flare)':'var(--cyan)'};">${peer.name}</span></td>
+      <td>${peer.team}</td>
+      <td class="${vsDiff>0?'stat-comparison better':'vbdneg'}">${peer.stats2025.yds}</td>
+      <td class="${tdDiff>0?'stat-comparison better':'vbdneg'}">${peer.stats2025.td}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+  
+  const rankCite = p.rankSource ? rankSourceLabel(p) : 'ESPN (Field Yates PPR, Aug 2026)';
+  html += `<div class="source-cite">
+    <strong>Sources:</strong> 2025 Full-Season Stats from NFL.com & ESPN Fantasy | 2026 Schedule from NFL.com | Rank from ${rankCite} | Comparisons drawn from position-group peer analysis
+  </div>`;
+  
+  document.getElementById('modalTitle').textContent = p.name;
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('playerModal').classList.add('open');
+}
+function closePlayerModal(){
+  document.getElementById('playerModal').classList.remove('open');
+}
+
+// Where a player's `rank` actually came from — set by syncPlayersFromAPI().
+// Undefined means it's still the hardcoded preseason seed data.
+const RANK_SOURCE_LABELS = {
+  'ecr': 'FantasyPros ECR',
+  'ecr-demo': 'FantasyPros ECR (demo)',
+  'sleeper': 'Sleeper (popularity)',
+  'sleeper-demo': 'Sleeper (popularity, demo)',
+};
+const RANK_SOURCE_SHORT = { 'ecr':'ECR', 'ecr-demo':'ECR·demo', 'sleeper':'SLP', 'sleeper-demo':'SLP·demo' };
+const RANK_SOURCE_COLOR = { 'ecr':'var(--mint)', 'ecr-demo':'var(--gold)', 'sleeper':'var(--cyan)', 'sleeper-demo':'var(--gold)' };
+
+function rankSourceLabel(p){ return RANK_SOURCE_LABELS[p.rankSource] || 'Preseason seed'; }
+function rankSourceBadge(p){
+  const short = RANK_SOURCE_SHORT[p.rankSource];
+  if(!short) return '';
+  const color = RANK_SOURCE_COLOR[p.rankSource];
+  return ` <span style="font-family:var(--font-mono);font-size:8.5px;color:${color};border:1px solid ${color};border-radius:3px;padding:0 3px;white-space:nowrap;" title="${rankSourceLabel(p)}">${short}</span>`;
+}
+
+/* =========================================================
+   VBD / TIERS / EDGE
+========================================================= */
+function replacementRank(pos){
+  const s = state.rosterSlots, tc = state.teamCount;
+  const flexShare = ['RB','WR','TE'].includes(pos) ? (s.FLEX||0)/3 : 0;
+  return Math.max(1, Math.round(tc * ((s[pos]||0) + flexShare)));
+}
+function withVBD(){
+  const byPos = {};
+  state.players.forEach(p=>{ (byPos[p.pos]=byPos[p.pos]||[]).push(p); });
+  Object.entries(byPos).forEach(([pos,arr])=>{
+    arr.sort((a,b)=>b.stats2025.yds-a.stats2025.yds);
+    const rIdx = Math.min(replacementRank(pos), arr.length) - 1;
+    const c = POS_CURVE[pos] || {anchor:150,decay:5,floor:20};
+    const replacementPts = arr[rIdx] ? Math.max(c.floor, c.anchor - c.decay*rIdx) : arr[arr.length-1].stats2025.yds;
+    arr.forEach(p=>{ p.projPts = Math.max(c.floor, c.anchor - c.decay*arr.indexOf(p)); p.vbd = Math.round((p.projPts - replacementPts)*10)/10; });
+  });
+}
+function withTiers(){
+  const byPos = {};
+  state.players.forEach(p=>{ (byPos[p.pos]=byPos[p.pos]||[]).push(p); });
+  Object.values(byPos).forEach(arr=>{
+    arr.sort((a,b)=>a.rank-b.rank);
+    let tier=1;
+    arr.forEach((p,i)=>{
+      if(i>0){ const gap = p.rank - arr[i-1].rank; if(gap > Math.max(4, arr[i-1].rank*0.15)) tier++; }
+      // FantasyPros' own tier (real analyst consensus, synced onto the
+      // player) is more trustworthy than our rank-gap heuristic when we
+      // have one — but the heuristic counter still advances regardless, so
+      // neighboring non-ECR players keep a sensible tier progression.
+      p.tier = p.ecrTier || tier;
+    });
+  });
+}
+function withEdge(){
+  const byPos = {};
+  state.players.forEach(p=>{ (byPos[p.pos]=byPos[p.pos]||[]).push(p); });
+  Object.values(byPos).forEach(arr=>{
+    const vbds = arr.map(p=>p.vbd);
+    const min = Math.min(...vbds), max = Math.max(...vbds);
+    arr.forEach(p=>{
+      let base = max>min ? ((p.vbd-min)/(max-min))*100 : 50;
+      // A live-synced signal (real injury status) is more current than the
+      // hardcoded seed tags, so it takes precedence when both exist.
+      const sig = state.liveSignals[p.name] || SIGNAL_TAGS[p.name];
+      if(sig){
+        if(sig.type==='breakout') base += 10;
+        if(sig.type==='value') base += 6;
+        if(sig.type==='risk') base -= 10;
+      }
+      p.edge = Math.max(0, Math.min(100, Math.round(base)));
+      p.signal = sig || null;
+    });
+  });
+}
+function recomputeAll(){ withVBD(); withTiers(); withEdge(); }
+
+/* =========================================================
+   EXPLORER
+========================================================= */
+let activePosFilter='ALL', sortKey='rank', sortDir=1, watchOnly=false, hideDrafted=false;
+
+function renderPosFilters(){
+  const positions=['ALL','QB','RB','WR','TE','K','DST','IDP'];
+  document.getElementById('posFilters').innerHTML = positions.map(p=>`<button class="pillbtn ${p===activePosFilter?'active':''}" data-pos="${p}">${p}</button>`).join('');
+  document.querySelectorAll('#posFilters button').forEach(b=>b.onclick=()=>{activePosFilter=b.dataset.pos; renderPosFilters(); renderExplorer();});
+}
+
+function renderExplorer(){
+  recomputeAll();
+  const search = document.getElementById('searchBox').value.toLowerCase();
+  let list = state.players.slice();
+  if(activePosFilter!=='ALL'){
+    list = activePosFilter==='FLEX' ? list.filter(p=>['RB','WR','TE'].includes(p.pos)) : list.filter(p=>p.pos===activePosFilter);
+  }
+  if(search) list = list.filter(p=>p.name.toLowerCase().includes(search)||p.team.toLowerCase().includes(search));
+  if(watchOnly) list = list.filter(p=>p.starred);
+  if(hideDrafted) list = list.filter(p=>!p.drafted);
+  list.sort((a,b)=>{ let av=a[sortKey], bv=b[sortKey]; if(typeof av==='string') return av.localeCompare(bv)*sortDir; return (av-bv)*sortDir; });
+
+  document.getElementById('explorerBody').innerHTML = list.map(p=>`
+    <tr class="${p.drafted?'drafted':''}">
+      <td data-label="Rank" class="rankcell">${p.rank}${rankSourceBadge(p)}</td>
+      <td data-label="★"><button class="btn small" data-star="${p.id}" style="background:none;border:none;font-size:14px;color:${p.starred?'var(--gold)':'var(--ink-500)'};">★</button></td>
+      <td data-label="Player" class="namecell" data-playerclick="${p.id}" style="cursor:pointer;">${p.name}${p.signal?` <span class="tag ${p.signal.type}" style="margin-left:6px;">${p.signal.type}</span>`:''}</td>
+      <td data-label="Pos"><span class="chip ${p.pos}">${p.pos}</span></td>
+      <td data-label="Team">${p.team}</td>
+      <td data-label="Bye" class="byecell">${p.bye}</td>
+      <td data-label="Tier" class="rankcell">T${p.tier}</td>
+      <td data-label="VBD" class="${p.vbd>=0?'vbdpos':'vbdneg'}">${p.vbd>0?'+':''}${p.vbd}</td>
+      <td data-label="Edge" class="rankcell">${p.edge}</td>
+      <td data-label="Drafted"><input type="checkbox" ${p.drafted?'checked':''} data-drafted="${p.id}"></td>
+    </tr>
+  `).join('');
+  document.querySelectorAll('[data-playerclick]').forEach(cell=>cell.onclick=()=>openPlayerModal(cell.dataset.playerclick));
+  document.querySelectorAll('[data-star]').forEach(b=>b.onclick=()=>{ toggleStar(b.dataset.star); });
+  document.querySelectorAll('[data-drafted]').forEach(cb=>cb.onchange=()=>{ toggleDrafted(cb.dataset.drafted); });
+  updateCounts();
+}
+function toggleStar(id){ const p=state.players.find(x=>x.id===id); p.starred=!p.starred; renderExplorer(); }
+function toggleDrafted(id){ const p=state.players.find(x=>x.id===id); p.drafted=!p.drafted; renderExplorer(); if(!document.getElementById('tab-tiers').classList.contains('hidden')) renderTiersTab(); if(!document.getElementById('tab-insights').classList.contains('hidden')) renderInsights(); }
+function updateCounts(){
+  document.getElementById('markedCount').textContent = state.players.filter(p=>p.drafted).length;
+  document.getElementById('starredCount').textContent = state.players.filter(p=>p.starred).length;
+}
+
+/* =========================================================
+   AI INSIGHTS
+========================================================= */
+function renderInsights(){
+  recomputeAll();
+  const avail = state.players.filter(p=>!p.drafted);
+
+  const edgePlays = avail.filter(p=>p.edge>=60).sort((a,b)=>b.edge-a.edge).slice(0,8);
+  document.getElementById('edgePlaysList').innerHTML = edgePlays.length ? edgePlays.map(p=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--ink-800);">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="chip ${p.pos}">${p.pos}</span><span style="cursor:pointer;color:var(--flare);text-decoration:underline;" data-playerclick2="${p.id}">${p.name}</span><span class="rankcell">rank #${p.rank}</span>
+      </div>
+      <div style="color:var(--mint);font-family:var(--font-mono);font-weight:700;">${p.edge} edge</div>
+    </div>`).join('') : `<p class="subtext">No standout value gaps left on the board.</p>`;
+  document.querySelectorAll('[data-playerclick2]').forEach(cell=>cell.onclick=()=>openPlayerModal(cell.dataset.playerclick2));
+
+  const breakouts = avail.filter(p=>p.signal && p.signal.type==='breakout');
+  document.getElementById('breakoutList').innerHTML = breakouts.length ? breakouts.map(p=>`
+    <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--ink-800);">
+      <div><span class="chip ${p.pos}">${p.pos}</span> <span style="cursor:pointer;color:var(--mint);" data-playerclick3="${p.id}">${p.name}</span></div>
+      <div style="color:var(--paper-300);font-size:12px;max-width:400px;">${p.signal.note}</div>
+    </div>`).join('') : `<p class="subtext">No breakout candidates flagged.</p>`;
+  document.querySelectorAll('[data-playerclick3]').forEach(cell=>cell.onclick=()=>openPlayerModal(cell.dataset.playerclick3));
+
+  const risks = avail.filter(p=>p.signal && p.signal.type==='risk');
+  document.getElementById('riskList').innerHTML = risks.length ? risks.map(p=>`
+    <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--ink-800);">
+      <div><span class="chip ${p.pos}">${p.pos}</span> <span style="cursor:pointer;color:var(--flare);" data-playerclick4="${p.id}">${p.name}</span></div>
+      <div style="color:var(--paper-300);font-size:12px;max-width:400px;">${p.signal.note}</div>
+    </div>`).join('') : `<p class="subtext">No risk flags.</p>`;
+  document.querySelectorAll('[data-playerclick4]').forEach(cell=>cell.onclick=()=>openPlayerModal(cell.dataset.playerclick4));
+}
+
+/* =========================================================
+   TIERS & SCARCITY
+========================================================= */
+function renderTiersTab(){
+  recomputeAll();
+  const positions=['QB','RB','WR','TE','K','DST','IDP'];
+  const strip = positions.map(pos=>{
+    const avail = state.players.filter(p=>p.pos===pos && !p.drafted);
+    if(avail.length===0) return `<div class="scarcard"><div class="n">0</div><div class="l">${pos} left</div></div>`;
+    const topTier = Math.min(...avail.map(p=>p.tier));
+    const inTop = avail.filter(p=>p.tier===topTier).length;
+    return `<div class="scarcard ${inTop<=2?'tight':''}"><div class="n">${inTop}</div><div class="l">Tier ${topTier} ${pos} left</div></div>`;
+  }).join('');
+  document.getElementById('scarcityStrip').innerHTML = strip;
+
+  let html='';
+  positions.forEach(pos=>{
+    const avail = state.players.filter(p=>p.pos===pos && !p.drafted).sort((a,b)=>a.rank-b.rank);
+    if(avail.length===0) return;
+    const grouped={};
+    avail.forEach(p=>{ (grouped[p.tier]=grouped[p.tier]||[]).push(p); });
+    html += `<div style="margin-bottom:20px;"><h4 style="font-family:var(--font-display);text-transform:uppercase;font-size:14px;margin:0 0 8px;"><span class="chip ${pos}">${pos}</span></h4>`;
+    Object.entries(grouped).slice(0,5).forEach(([tier,players],idx)=>{
+      const warn = players.length<=2 && idx===0;
+      html += `<div style="margin-bottom:8px;">
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--paper-300);margin-bottom:4px;">TIER ${tier} ${warn?'<span style="color:var(--flare);">⚠ cliff approaching</span>':''}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">${players.map(p=>`<div style="background:var(--gradient-dark);border:1px solid var(--ink-650);border-radius:8px;padding:8px 12px;font-size:12.5px;display:flex;gap:8px;align-items:center;cursor:pointer;transition:all .2s;" data-playerclick5="${p.id}">${p.name} <span class="rankcell">#${p.rank}</span></div>`).join('')}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  document.getElementById('tiersContainer').innerHTML = html;
+  document.querySelectorAll('[data-playerclick5]').forEach(cell=>cell.onclick=()=>openPlayerModal(cell.dataset.playerclick5));
+}
+
+/* =========================================================
+   ANALYST FEED (podcast-insights backend)
+========================================================= */
+let activeInsightPos = 'ALL';
+
+async function fetchInsights(){
+  const dot = document.querySelectorAll('.conn-dot');
+  try{
+    const res = await fetch(`${state.insightsApiBase}/api/insights`);
+    if(!res.ok) throw new Error('bad status');
+    state.insights = await res.json();
+    state.insightsConnected = true;
+  }catch(err){
+    state.insights = FALLBACK_INSIGHTS;
+    state.insightsConnected = false;
+  }
+  updateConnStatus();
+  if(!document.getElementById('tab-podcast').classList.contains('hidden')) renderPodcastTab();
+}
+function updateConnStatus(){
+  const ok = state.insightsConnected;
+  const label = ok ? 'live from backend' : 'sample data (backend unreachable)';
+  const connEl = document.getElementById('connStatus');
+  if(connEl) connEl.innerHTML = `<span class="conn-dot ${ok?'ok':'bad'}"></span>${label}`;
+  const syncEl = document.getElementById('insightsSyncStatus');
+  if(syncEl) syncEl.innerHTML = `<span class="conn-dot ${ok?'ok':'bad'}"></span>${ok?`connected · ${state.insights.length} insight(s)`:'not connected — showing sample data'}`;
+}
+function testInsightsConnection(){
+  state.insightsApiBase = document.getElementById('cfgInsightsBase').value.trim() || 'http://localhost:3001';
+  fetchInsights();
+}
+
+function playerInsights(name){
+  const n = name.toLowerCase();
+  return state.insights.filter(i => i.player.toLowerCase()===n || n.includes(i.player.toLowerCase()) || i.player.toLowerCase().includes(n));
+}
+
+function insightCardHTML(i){
+  const positive = POSITIVE_OPINIONS.includes(i.opinion);
+  return `<div class="insight-card">
+    <div class="insight-top">
+      ${i.position?`<span class="chip ${i.position}">${i.position}</span>`:''}
+      <span class="insight-player" data-insightplayer="${i.player.replace(/"/g,'&quot;')}">${i.player}</span>
+      ${i.opinion?`<span class="opinion-badge ${positive?'pos':'neg'}">${i.opinion}</span>`:''}
+      ${i.date?`<span class="insight-date">${i.date}</span>`:''}
+    </div>
+    <div class="insight-quote">&ldquo;${i.quote}&rdquo;</div>
+    <div class="insight-meta"><b>${i.analyst}</b>${i.podcast?` · ${i.podcast}`:''}${i.timestamp?` · ${i.timestamp}`:''}</div>
+  </div>`;
+}
+
+function bindInsightPlayerClicks(container){
+  container.querySelectorAll('[data-insightplayer]').forEach(el=>{
+    el.onclick = ()=>{
+      const p = state.players.find(x=>x.name.toLowerCase()===el.dataset.insightplayer.toLowerCase());
+      if(p) openPlayerModal(p.id);
+    };
+  });
+}
+
+function renderRosterInsights(){
+  const el = document.getElementById('rosterInsightsList');
+  if(!state.myRoster.length){
+    el.innerHTML = `<p class="subtext">No players on your roster yet — add some on the Dashboard to see what analysts say about them here.</p>`;
+    return;
+  }
+  const rows = state.myRoster.map(p => ({ p, matches: playerInsights(p.name) })).filter(r => r.matches.length);
+  if(!rows.length){
+    el.innerHTML = `<p class="subtext">No analyst chatter on file yet for your current roster.</p>`;
+    return;
+  }
+  el.innerHTML = rows.map(r => r.matches.map(insightCardHTML).join('')).join('');
+  bindInsightPlayerClicks(el);
+}
+
+function renderInsightPosFilters(){
+  const positions=['ALL','QB','RB','WR','TE'];
+  const el = document.getElementById('insightPosFilters');
+  if(!el) return;
+  el.innerHTML = positions.map(p=>`<button class="pillbtn ${p===activeInsightPos?'active':''}" data-ipos="${p}">${p}</button>`).join('');
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ activeInsightPos=b.dataset.ipos; renderInsightPosFilters(); renderInsightGrid(); });
+}
+
+function renderInsightGrid(){
+  const player = (document.getElementById('insightPlayerBox').value||'').toLowerCase();
+  const analyst = (document.getElementById('insightAnalystBox').value||'').toLowerCase();
+  let list = state.insights.slice();
+  if(activeInsightPos!=='ALL') list = list.filter(i=>i.position===activeInsightPos);
+  if(player) list = list.filter(i=>i.player.toLowerCase().includes(player));
+  if(analyst) list = list.filter(i=>i.analyst.toLowerCase().includes(analyst));
+  const el = document.getElementById('insightGridList');
+  el.innerHTML = list.length ? list.map(insightCardHTML).join('') : `<p class="subtext">No insights match that search.</p>`;
+  bindInsightPlayerClicks(el);
+}
+
+function renderPodcastTab(){
+  updateConnStatus();
+  renderRosterInsights();
+  renderInsightGrid();
+}
+
+/* =========================================================
+   ROSTER MANAGEMENT & DASHBOARD
+========================================================= */
+function renderDashboard(){
+  recomputeAll();
+  renderRosterSearch();
+  renderRoster();
+  renderCoverage();
+  renderByeAnalysis();
+  renderStrengthScore();
+}
+function renderRosterSearch(){
+  const search = document.getElementById('rosterSearchBox').value.toLowerCase();
+  if(!search){ document.getElementById('rosterSuggestions').innerHTML = ''; return; }
+  const avail = state.players.filter(p=>!state.myRoster.find(r=>r.id===p.id) && (p.name.toLowerCase().includes(search) || p.team.toLowerCase().includes(search)));
+  document.getElementById('rosterSuggestions').innerHTML = avail.slice(0,5).map(p=>`
+    <button class="pillbtn" style="margin-right:4px;margin-bottom:4px;" data-addroster="${p.id}">${p.name} <span style="color:var(--paper-300);font-size:10px;margin-left:6px;">${p.pos} • #${p.rank}</span></button>
+  `).join('');
+  document.querySelectorAll('[data-addroster]').forEach(b=>b.onclick=()=>addToRoster(b.dataset.addroster));
+}
+function addToRoster(playerId){
+  const p = state.players.find(x=>x.id===playerId);
+  if(p && !state.myRoster.find(r=>r.id===playerId)){
+    state.myRoster.push(p);
+    document.getElementById('rosterSearchBox').value = '';
+    renderDashboard();
+  }
+}
+function removeFromRoster(playerId){
+  state.myRoster = state.myRoster.filter(p=>p.id!==playerId);
+  renderDashboard();
+}
+function renderRoster(){
+  const html = state.myRoster.length ? state.myRoster.map((p,i)=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--ink-800);">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="chip ${p.pos}">${p.pos}</span>
+        <div><span style="cursor:pointer;color:var(--flare);" data-playerclick6="${p.id}">${p.name}</span><br><span class="rankcell">${p.team} • Bye ${p.bye} • #${p.rank}</span></div>
+      </div>
+      <button class="btn small" data-rmroster="${p.id}" style="background:rgba(255,90,54,.1);border-color:var(--flare);color:var(--flare);">Remove</button>
+    </div>
+  `).join('') : `<p class="subtext">No players on your roster yet. Search and add them above.</p>`;
+  document.getElementById('rosterDisplay').innerHTML = html;
+  document.querySelectorAll('[data-playerclick6]').forEach(cell=>cell.onclick=()=>openPlayerModal(cell.dataset.playerclick6));
+  document.querySelectorAll('[data-rmroster]').forEach(b=>b.onclick=()=>removeFromRoster(b.dataset.rmroster));
+}
+function renderCoverage(){
+  const coverage = {QB:0,RB:0,WR:0,TE:0,K:0,DST:0,IDP:0};
+  state.myRoster.forEach(p=>{ if(coverage[p.pos]!==undefined) coverage[p.pos]++; });
+  const html = Object.entries(coverage).map(([pos,count])=>{
+    const need = state.rosterSlots[pos] || 0;
+    const filled = count>=need;
+    return `<div style="background:var(--gradient-dark);border:1px solid var(--ink-650);border-radius:10px;padding:12px;text-align:center;">
+      <div style="color:var(--paper-300);font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">${pos}</div>
+      <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:${filled?'var(--mint)':'var(--gold)'};margin-bottom:2px;">${count>=need?'✓':count+'/'+need}</div>
+      <div style="color:var(--paper-300);font-size:9px;">${count} / ${need}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('coverageDisplay').innerHTML = html;
+}
+function renderByeAnalysis(){
+  const byes = {};
+  state.myRoster.forEach(p=>{ (byes[p.bye]=byes[p.bye]||[]).push(p.name); });
+  const collisions = Object.entries(byes).filter(([,names])=>names.length>1);
+  let html = '';
+  if(collisions.length){
+    html = `<div class="alertbar flare">⚠ Bye week collisions:<br>${collisions.map(([w,n])=>`<b>Week ${w}:</b> ${n.join(', ')}`).join('<br>')}</div>`;
+  } else {
+    html = '<div class="alertbar mint">✓ No bye week conflicts.</div>';
+  }
+  const byeDistribution = Object.entries(byes).map(([w,n])=>`<b>Wk${w}:</b> ${n.length}`).join(' • ');
+  html += `<div style="color:var(--paper-300);font-size:13px;margin-top:8px;">Distribution: ${byeDistribution || '(no players yet)'}</div>`;
+  document.getElementById('byeAnalysis').innerHTML = html;
+}
+function renderStrengthScore(){
+  if(state.myRoster.length===0){ 
+    document.getElementById('strengthScore').textContent = '—';
+    document.getElementById('strengthBar').style.width='0%';
+    return;
+  }
+  recomputeAll();
+  const totalVBD = state.myRoster.reduce((sum,p)=>sum+(p.vbd||0), 0);
+  const maxPossible = state.myRoster.length * 30;
+  const score = Math.round((totalVBD / maxPossible)*100);
+  document.getElementById('strengthScore').textContent = score;
+  document.getElementById('strengthBar').style.width = score+'%';
+}
+
+/* =========================================================
+   KEEPERS
+========================================================= */
+function roundForRank(rank){ return Math.ceil(rank / state.teamCount); }
+function renderKeepers(){
+  document.getElementById('keeperRows').innerHTML = state.keepers.map(k=>{
+    const round = roundForRank(k.rank);
+    return `<div style="display:grid;grid-template-columns:26px 1fr 70px 90px 90px 150px;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--ink-800);">
+      <div><input type="checkbox" ${k.selected?'checked':''} data-kcheck="${k.id}"></div>
+      <div><input type="text" value="${k.name}" data-kname="${k.id}" style="width:100%;background:var(--ink-800);border:1px solid var(--ink-650);color:var(--paper-100);padding:5px 6px;border-radius:3px;"></div>
+      <div><span class="chip ${k.pos}">${k.pos}</span></div>
+      <div><input type="number" min="1" value="${k.rank}" data-krank="${k.id}" style="width:100%;background:var(--ink-800);border:1px solid var(--ink-650);color:var(--paper-100);padding:5px 6px;border-radius:3px;font-family:var(--font-mono);"></div>
+      <div><span class="roundpill" data-kround="${k.id}">R${round}</span></div>
+      <div style="font-size:11px;color:var(--paper-300);" data-knote="${k.id}"></div>
+    </div>`;
+  }).join('');
+  state.keepers.forEach(k=>{
+    document.querySelector(`[data-kcheck="${k.id}"]`).onchange = e=>{ k.selected=e.target.checked; renderKeepers(); };
+    document.querySelector(`[data-kname="${k.id}"]`).onchange = e=>{ k.name=e.target.value; };
+    document.querySelector(`[data-krank="${k.id}"]`).onchange = e=>{ k.rank=parseInt(e.target.value)||1; renderKeepers(); };
+  });
+  evaluateKeeperConflicts();
+  document.getElementById('keeperCountLabel').textContent = `${state.keepers.filter(k=>k.selected).length} / ${state.maxKeepers} keepers selected`;
+}
+function evaluateKeeperConflicts(){
+  const selected = state.keepers.filter(k=>k.selected);
+  const byRound={};
+  selected.forEach(k=>{ const r=roundForRank(k.rank); (byRound[r]=byRound[r]||[]).push(k); });
+  let banner='';
+  if(selected.length>state.maxKeepers) banner += `<div class="alertbar flare">You have ${selected.length} keepers — max is ${state.maxKeepers}.</div>`;
+  Object.entries(byRound).forEach(([round,ks])=>{
+    if(ks.length>1){
+      banner += `<div class="alertbar flare">⚠ Round ${round}: ${ks.map(k=>k.name).join(' vs ')}. Choose which one.</div>`;
+      ks.forEach(k=>{
+        document.querySelector(`[data-kround="${k.id}"]`).classList.add('conflict');
+        document.querySelector(`[data-knote="${k.id}"]`).innerHTML = `<button class="btn small" data-winround="${k.id}">Keep at R${round}</button>`;
+      });
+    }
+  });
+  document.getElementById('keeperConflictBanner').innerHTML = banner;
+  document.querySelectorAll('[data-winround]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const winner = state.keepers.find(k=>k.id===btn.dataset.winround);
+      const round = roundForRank(winner.rank);
+      state.keepers.forEach(k=>{ if(k.id!==winner.id && roundForRank(k.rank)===round && k.selected) k.selected=false; });
+      renderKeepers();
+    };
+  });
+  renderKeeperRecommendation();
+}
+function renderKeeperRecommendation(){
+  const selected = state.keepers.filter(k=>k.selected);
+  const el = document.getElementById('keeperRecommendation');
+  if(selected.length===0){ el.innerHTML=''; return; }
+  el.innerHTML = `<div class="card"><h4 style="font-family:var(--font-display);margin:0 0 8px;text-transform:uppercase;">Your Keeper Slate</h4><ul style="margin:0;padding-left:18px;">${
+    selected.map(k=>`<li><b>${k.name}</b> (${k.pos}) — costs Round ${roundForRank(k.rank)}, ESPN rank #${k.rank}</li>`).join('')
+  }</ul></div>`;
+}
+function addKeeperCandidate(){ state.keepers.push({id:'k'+Date.now(), name:'New Player', pos:'WR', rank:150, selected:false}); renderKeepers(); }
+
+/* =========================================================
+   SETUP + RANKINGS SYNC
+========================================================= */
+function renderRosterSlotsGrid(){
+  const s=state.rosterSlots;
+  document.getElementById('rosterSlotsGrid').innerHTML = Object.keys(s).map(key=>`
+    <div style="display:flex;flex-direction:column;"><label style="font-size:11px;color:var(--paper-300);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:var(--font-mono);">${key}</label><input type="number" min="0" max="10" value="${s[key]}" data-slot="${key}"></div>
+  `).join('');
+}
+function applySetup(){
+  state.teamCount = parseInt(document.getElementById('cfgTeamCount').value);
+  state.maxKeepers = parseInt(document.getElementById('cfgMaxKeepers').value);
+  document.querySelectorAll('[data-slot]').forEach(inp=>{ state.rosterSlots[inp.dataset.slot]=parseInt(inp.value)||0; });
+  renderAll();
+}
+// Small, clearly-labeled stand-in for a real /api/players response — used
+// only when the backend genuinely can't be reached, so clicking "Sync
+// Players from API" always visibly does *something* instead of just
+// failing (same philosophy as the Analyst Feed's FALLBACK_INSIGHTS). Reuses
+// existing seed-data names rather than inventing new stat lines; only the
+// rank/tier are demo values, deliberately different from their seed rank
+// so the effect of a sync is obvious.
+const DEMO_SYNCED_PLAYERS = [
+  { sleeper_id:'demo-chase', name:"Ja'Marr Chase", pos:'WR', team:'CIN', injury_status:null, ecr_rank:2, ecr_tier:1, bye_week:10, rank:2, schedule_summary:'Week 1 @CLE, Week 2 vs BAL, Week 3 @PIT, Week 4 vs MIA, Week 5 @NYJ' },
+  { sleeper_id:'demo-cbrown', name:'Chase Brown', pos:'RB', team:'CIN', injury_status:null, ecr_rank:9, ecr_tier:2, bye_week:10, rank:9, schedule_summary:'Week 1 @CLE, Week 2 vs BAL, Week 3 @PIT, Week 4 vs MIA, Week 5 @NYJ' },
+  { sleeper_id:'demo-bowers', name:'Brock Bowers', pos:'TE', team:'LV', injury_status:null, ecr_rank:11, ecr_tier:1, bye_week:8, rank:11 },
+  { sleeper_id:'demo-bucky', name:'Bucky Irving', pos:'RB', team:'TB', injury_status:'Questionable', ecr_rank:38, ecr_tier:4, bye_week:10, rank:38 },
+  { sleeper_id:'demo-kittle', name:'George Kittle', pos:'TE', team:'SF', injury_status:'Questionable', ecr_rank:20, ecr_tier:2, bye_week:9, rank:20 },
+];
+
+// Shared by the real sync path and the demo fallback below, so both
+// exercise identical merge logic — by name, update-in-place or add, same
+// pattern parseImport() uses for pasted rows.
+function mergeSyncedPlayers(synced, { demo = false } = {}){
+  let added = 0, updated = 0;
+  synced.forEach(sp => {
+    if(!sp.pos || !sp.name) return;
+    // sp.rank is FantasyPros' expert consensus rank when present, falling
+    // back to Sleeper's popularity-based search_rank.
+    const source = sp.ecr_rank ? (demo?'ecr-demo':'ecr') : (sp.rank ? (demo?'sleeper-demo':'sleeper') : null);
+    const existing = state.players.find(p => p.name.toLowerCase() === sp.name.toLowerCase());
+    if(existing){
+      existing.pos = sp.pos; existing.team = sp.team || existing.team;
+      if(sp.rank){ existing.rank = sp.rank; existing.rankSource = source; }
+      if(sp.ecr_tier) existing.ecrTier = sp.ecr_tier;
+      if(sp.bye_week) existing.bye = sp.bye_week;
+      if(sp.schedule_summary) existing.schedule2026 = sp.schedule_summary;
+      if(sp.stats){ existing.stats2025 = { yds: sp.stats.yds, td: sp.stats.td, type: existing.stats2025?.type || 'Rec' }; }
+      updated++;
+    } else if(sp.rank) {
+      state.players.push({
+        id:'p'+(sp.sleeper_id||sp.name), name:sp.name, pos:sp.pos, team:sp.team||'', rank:sp.rank, bye:sp.bye_week||0,
+        rankSource: source, ecrTier: sp.ecr_tier || null,
+        stats2025: sp.stats ? { yds:sp.stats.yds, td:sp.stats.td, type:'Rec' } : { yds:0, td:0, type:'—' },
+        schedule2026: sp.schedule_summary || (demo ? 'TBD (added by the demo sync — not a real player pool)' : 'TBD — schedule not synced for this player'),
+        starred:false, drafted:false
+      });
+      added++;
+    }
+    if(sp.injury_status){
+      state.liveSignals[sp.name] = { type:'risk', note:`${demo?'[Demo] ':''}Live status from sync: ${sp.injury_status}.` };
+    }
+  });
+  state.players.sort((a,b)=>a.rank-b.rank);
+  return { added, updated };
+}
+
+// Pulls the real player pool from the backend's synced Sleeper + nflverse +
+// FantasyPros data (see backend/src/sync/) and merges it into state.players.
+async function syncPlayersFromAPI(){
+  const statusEl = document.getElementById('playerSyncStatus');
+  const btn = document.getElementById('btnSyncPlayers');
+  btn.disabled = true;
+  statusEl.textContent = 'Syncing…';
+
+  const useDemoFallback = (reason) => {
+    const { added, updated } = mergeSyncedPlayers(DEMO_SYNCED_PLAYERS, { demo:true });
+    state.lastSynced = `${new Date().toLocaleString()} — DEMO DATA (backend unreachable: ${reason}). Illustrative sample ranks only, not live.`;
+    document.getElementById('lastSynced').textContent = state.lastSynced;
+    statusEl.innerHTML = `<span style="color:var(--gold);">Demo: ${updated} updated, ${added} added — backend unreachable (${reason})</span>`;
+    renderAll();
+  };
+
+  try{
+    const triggerRes = await fetch(`${state.insightsApiBase}/api/sync/players`, { method:'POST' });
+    if(!triggerRes.ok) throw new Error(`Sync trigger failed: ${triggerRes.status}`);
+    const syncResult = await triggerRes.json();
+
+    // Derived rather than a hardcoded key list, so a new sync source added
+    // on the backend is automatically reflected here too.
+    const sourceKeys = Object.keys(syncResult).filter(k => syncResult[k] && typeof syncResult[k].ok === 'boolean');
+    const failed = sourceKeys.filter(k => !syncResult[k].ok);
+    if(failed.length === sourceKeys.length && !syncResult.playersInDb){
+      // Nothing succeeded on this call, and the backend has never synced
+      // successfully before either — genuinely nothing to merge.
+      useDemoFallback(syncResult.sleeper?.error || 'all sources failed');
+      return;
+    }
+    // Even if today's live pull failed outright, the backend may still be
+    // holding good data from an earlier successful sync — merge whatever's
+    // there rather than discarding it.
+
+    const playersRes = await fetch(`${state.insightsApiBase}/api/players`);
+    if(!playersRes.ok) throw new Error(`Fetching synced players failed: ${playersRes.status}`);
+    const synced = await playersRes.json();
+
+    const { added, updated } = mergeSyncedPlayers(synced, { demo:false });
+    state.lastSynced = new Date().toLocaleString() + ' (Sleeper + nflverse + FantasyPros via backend)';
+    document.getElementById('lastSynced').textContent = state.lastSynced;
+
+    // FantasyPros gets its own callout — it's gated by a cooldown (see
+    // docs/DATA_SOURCES.md), so "unavailable this run" can mean "skipped
+    // on purpose to protect the quota", not "broken".
+    const fp = syncResult.fantasyPros;
+    let fpNote = '';
+    if(fp?.skipped) fpNote = ` · FantasyPros ECR skipped (cooldown)`;
+    else if(fp?.ok && fp.matched) fpNote = ` · ${fp.matched} got a real FantasyPros rank`;
+    else if(fp && fp.ok === false) fpNote = ` · FantasyPros ECR failed (${fp.error})`;
+
+    const otherFailed = failed.filter(k => k !== 'fantasyPros');
+    const failNote = otherFailed.length ? ` (${otherFailed.join(', ')} unavailable this run)` : '';
+    statusEl.innerHTML = `<span style="color:var(--mint);">${updated} updated, ${added} added${failNote}${fpNote}</span>`;
+    renderAll();
+  }catch(err){
+    useDemoFallback(err.message);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function parseImport(){
+  const raw = document.getElementById('importBox').value.trim();
+  if(!raw){ document.getElementById('importStatus').textContent = 'Nothing to parse.'; return; }
+  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  let added=0, updated=0;
+  lines.forEach(line=>{
+    const parts = line.split(',').map(s=>s.trim());
+    if(parts.length<4) return;
+    const [name,pos,team,rank,bye] = parts;
+    const rankNum = parseInt(rank), byeNum = parseInt(bye)||0;
+    if(!name || !pos || isNaN(rankNum)) return;
+    const existing = state.players.find(p=>p.name.toLowerCase()===name.toLowerCase());
+    if(existing){ existing.rank=rankNum; existing.pos=pos.toUpperCase(); existing.team=team; existing.bye=byeNum; updated++; }
+    else { state.players.push({id:'p'+Date.now()+Math.random(), name, pos:pos.toUpperCase(), team, rank:rankNum, bye:byeNum, stats2025:{yds:1000,td:8,type:'Rec'}, schedule2026:'TBD', starred:false, drafted:false}); added++; }
+  });
+  state.players = state.players.sort((a,b)=>a.rank-b.rank);
+  state.lastSynced = new Date().toLocaleString();
+  document.getElementById('lastSynced').textContent = state.lastSynced;
+  document.getElementById('importStatus').textContent = `Merged: ${updated} updated, ${added} added.`;
+  document.getElementById('importBox').value = '';
+  renderAll();
+}
+
+/* =========================================================
+   SAVE / LOAD
+========================================================= */
+function saveState(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='draft-research-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+}
+function loadStateFromFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{ Object.assign(state, JSON.parse(e.target.result)); renderRosterSlotsGrid(); document.getElementById('lastSynced').textContent = state.lastSynced||'—'; renderAll(); }
+    catch(err){ alert('Could not read file.'); }
+  };
+  reader.readAsText(file);
+}
+function resetDrafted(){ state.players.forEach(p=>p.drafted=false); renderAll(); }
+
+/* =========================================================
+   TABS
+========================================================= */
+function switchTab(tab){
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  ['dashboard','explorer','insights','tiers','keepers','podcast','setup'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab));
+  if(tab==='dashboard') renderDashboard();
+  if(tab==='tiers') renderTiersTab();
+  if(tab==='keepers') renderKeepers();
+  if(tab==='insights') renderInsights();
+  if(tab==='podcast') renderPodcastTab();
+}
+
+/* =========================================================
+   BIND + RENDER
+========================================================= */
+function bindEvents(){
+  document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  document.getElementById('searchBox').oninput = renderExplorer;
+  document.getElementById('rosterSearchBox').oninput = renderRosterSearch;
+  document.getElementById('watchOnlyToggle').onclick = e=>{ watchOnly=!watchOnly; e.target.classList.toggle('active',watchOnly); renderExplorer(); };
+  document.getElementById('hideDraftedToggle').onclick = e=>{ hideDrafted=!hideDrafted; e.target.classList.toggle('active',hideDrafted); renderExplorer(); };
+  document.getElementById('btnResetDrafted').onclick = resetDrafted;
+  document.getElementById('btnSave').onclick = saveState;
+  document.getElementById('fileLoad').onchange = e=>{ if(e.target.files[0]) loadStateFromFile(e.target.files[0]); };
+  document.getElementById('btnAddKeeper').onclick = addKeeperCandidate;
+  document.getElementById('btnApplySetup').onclick = applySetup;
+  document.getElementById('btnOpenEspn').onclick = ()=>window.open('https://www.espn.com/fantasy/football/story/_/id/48711830/2026-fantasy-football-rankings-ppr-field-yates','_blank');
+  document.getElementById('btnParseImport').onclick = parseImport;
+  document.getElementById('btnSyncPlayers').onclick = syncPlayersFromAPI;
+  document.getElementById('insightPlayerBox').oninput = renderInsightGrid;
+  document.getElementById('insightAnalystBox').oninput = renderInsightGrid;
+  document.getElementById('btnTestInsights').onclick = testInsightsConnection;
+  document.getElementById('modalClose').onclick = closePlayerModal;
+  document.getElementById('playerModal').onclick = e=>{ if(e.target.id==='playerModal') closePlayerModal(); };
+  document.querySelectorAll('#tab-explorer th[data-sort]').forEach(th=>{
+    th.onclick = ()=>{ if(sortKey===th.dataset.sort) sortDir*=-1; else {sortKey=th.dataset.sort; sortDir=1;} renderExplorer(); };
+  });
+}
+function renderAll(){ renderExplorer(); if(!document.getElementById('tab-dashboard').classList.contains('hidden')) renderDashboard(); }
+
+window.onload = init;
+</script>
 </body>
 </html>
