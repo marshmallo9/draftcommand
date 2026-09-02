@@ -123,15 +123,50 @@ function computeByeWeeks(scheduleRows) {
   return byeByTeam;
 }
 
+// Formats each team's first `weeksToShow` regular-season games as
+// "Week 1 @PHI, Week 2 vs TB, ..." — the same string shape the app's
+// hardcoded SEED_PLAYERS already uses for schedule2026, so a synced value
+// drops straight into the player modal with no format translation needed.
+function computeTeamSchedules(scheduleRows, weeksToShow = 5) {
+  const regRows = scheduleRows.filter(r => !('game_type' in r) || r.game_type === 'REG');
+  const seasonRows = regRows.filter(r => !r.season || String(r.season) === String(CURRENT_SEASON));
+
+  const gamesByTeam = {};
+  for (const row of seasonRows) {
+    const week = Number(row.week);
+    const home = row.home_team, away = row.away_team;
+    if (!week || !home || !away) continue;
+    (gamesByTeam[home] = gamesByTeam[home] || []).push({ week, opp: away, home: true });
+    (gamesByTeam[away] = gamesByTeam[away] || []).push({ week, opp: home, home: false });
+  }
+
+  const summaryByTeam = {};
+  for (const [team, games] of Object.entries(gamesByTeam)) {
+    const sorted = games.sort((a, b) => a.week - b.week).slice(0, weeksToShow);
+    if (sorted.length) {
+      summaryByTeam[team] = sorted.map(g => `Week ${g.week} ${g.home ? 'vs ' : '@'}${g.opp}`).join(', ');
+    }
+  }
+  return summaryByTeam;
+}
+
 async function syncNflverseSchedules() {
   const rows = await fetchSchedules(CURRENT_SEASON);
   const byeByTeam = computeByeWeeks(rows);
+  const summaryByTeam = computeTeamSchedules(rows);
+  const teams = new Set([...Object.keys(byeByTeam), ...Object.keys(summaryByTeam)]);
+
   let playersUpdated = 0;
-  for (const [team, week] of Object.entries(byeByTeam)) {
-    const res = await run('UPDATE players SET bye_week = ? WHERE team = ?', [week, team]);
+  for (const team of teams) {
+    // COALESCE keeps whatever's already stored when this particular team
+    // resolved only one of the two (e.g. bye week found, summary didn't).
+    const res = await run(
+      'UPDATE players SET bye_week = COALESCE(?, bye_week), schedule_summary = COALESCE(?, schedule_summary) WHERE team = ?',
+      [byeByTeam[team] ?? null, summaryByTeam[team] ?? null, team]
+    );
     playersUpdated += res.changes;
   }
-  return { teamsResolved: Object.keys(byeByTeam).length, playersUpdated };
+  return { teamsResolved: teams.size, playersUpdated };
 }
 
 // One call, all positions at once (see fetchConsensusRankings), gated by a
@@ -217,4 +252,4 @@ async function runSync(opts = {}) {
   return result;
 }
 
-module.exports = { runSync, summarizeStatsRow, computeByeWeeks, CURRENT_SEASON, FANTASYPROS_COOLDOWN_HOURS };
+module.exports = { runSync, summarizeStatsRow, computeByeWeeks, computeTeamSchedules, CURRENT_SEASON, FANTASYPROS_COOLDOWN_HOURS };

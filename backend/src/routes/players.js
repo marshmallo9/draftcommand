@@ -19,7 +19,7 @@ router.get('/players', async (req, res, next) => {
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const rows = await all(
       `SELECT sleeper_id, name, pos, team, status, injury_status, search_rank, ecr_rank, ecr_tier,
-              bye_week, season_stats_json, synced_at
+              bye_week, schedule_summary, season_stats_json, synced_at
        FROM players ${where}
        ORDER BY COALESCE(ecr_rank, search_rank) ASC NULLS LAST, name ASC`,
       params

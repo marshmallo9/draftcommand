@@ -1038,8 +1038,8 @@ function applySetup(){
 // rank/tier are demo values, deliberately different from their seed rank
 // so the effect of a sync is obvious.
 const DEMO_SYNCED_PLAYERS = [
-  { sleeper_id:'demo-chase', name:"Ja'Marr Chase", pos:'WR', team:'CIN', injury_status:null, ecr_rank:2, ecr_tier:1, bye_week:10, rank:2 },
-  { sleeper_id:'demo-cbrown', name:'Chase Brown', pos:'RB', team:'CIN', injury_status:null, ecr_rank:9, ecr_tier:2, bye_week:10, rank:9 },
+  { sleeper_id:'demo-chase', name:"Ja'Marr Chase", pos:'WR', team:'CIN', injury_status:null, ecr_rank:2, ecr_tier:1, bye_week:10, rank:2, schedule_summary:'Week 1 @CLE, Week 2 vs BAL, Week 3 @PIT, Week 4 vs MIA, Week 5 @NYJ' },
+  { sleeper_id:'demo-cbrown', name:'Chase Brown', pos:'RB', team:'CIN', injury_status:null, ecr_rank:9, ecr_tier:2, bye_week:10, rank:9, schedule_summary:'Week 1 @CLE, Week 2 vs BAL, Week 3 @PIT, Week 4 vs MIA, Week 5 @NYJ' },
   { sleeper_id:'demo-bowers', name:'Brock Bowers', pos:'TE', team:'LV', injury_status:null, ecr_rank:11, ecr_tier:1, bye_week:8, rank:11 },
   { sleeper_id:'demo-bucky', name:'Bucky Irving', pos:'RB', team:'TB', injury_status:'Questionable', ecr_rank:38, ecr_tier:4, bye_week:10, rank:38 },
   { sleeper_id:'demo-kittle', name:'George Kittle', pos:'TE', team:'SF', injury_status:'Questionable', ecr_rank:20, ecr_tier:2, bye_week:9, rank:20 },
@@ -1061,6 +1061,7 @@ function mergeSyncedPlayers(synced, { demo = false } = {}){
       if(sp.rank){ existing.rank = sp.rank; existing.rankSource = source; }
       if(sp.ecr_tier) existing.ecrTier = sp.ecr_tier;
       if(sp.bye_week) existing.bye = sp.bye_week;
+      if(sp.schedule_summary) existing.schedule2026 = sp.schedule_summary;
       if(sp.stats){ existing.stats2025 = { yds: sp.stats.yds, td: sp.stats.td, type: existing.stats2025?.type || 'Rec' }; }
       updated++;
     } else if(sp.rank) {
@@ -1068,7 +1069,7 @@ function mergeSyncedPlayers(synced, { demo = false } = {}){
         id:'p'+(sp.sleeper_id||sp.name), name:sp.name, pos:sp.pos, team:sp.team||'', rank:sp.rank, bye:sp.bye_week||0,
         rankSource: source, ecrTier: sp.ecr_tier || null,
         stats2025: sp.stats ? { yds:sp.stats.yds, td:sp.stats.td, type:'Rec' } : { yds:0, td:0, type:'—' },
-        schedule2026: demo ? 'TBD (added by the demo sync — not a real player pool)' : 'TBD (full weekly matchups aren\'t synced yet, only the bye week — see docs/DATA_SOURCES.md)',
+        schedule2026: sp.schedule_summary || (demo ? 'TBD (added by the demo sync — not a real player pool)' : 'TBD — schedule not synced for this player'),
         starred:false, drafted:false
       });
       added++;

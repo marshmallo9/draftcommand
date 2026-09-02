@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS players (
   bye_week INTEGER,             -- derived from nflverse's schedules release (the one week a
                                  -- team appears in no game); null until that team's schedule
                                  -- has been matched, or if the gap couldn't be determined cleanly
+  schedule_summary TEXT,        -- "Week 1 vs KC, Week 2 @DAL, ..." for the team's first 5 games —
+                                 -- same string shape SEED_PLAYERS already uses, from nflverse's
+                                 -- schedules release (see src/sync/index.js#computeTeamSchedules)
   season_stats_json TEXT,       -- raw matched row from nflverse player_stats, stored as-is
                                  -- (column names vary by season/source revision, so we don't
                                  -- assume a fixed shape — consumers read defensively)

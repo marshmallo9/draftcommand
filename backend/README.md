@@ -108,6 +108,7 @@ Query params (all optional, combinable): `position` (exact, e.g. `RB`), `team`
     "ecr_rank": 2,
     "ecr_tier": 1,
     "bye_week": 10,
+    "schedule_summary": "Week 1 @CLE, Week 2 vs BAL, Week 3 @PIT, Week 4 vs MIA, Week 5 @NYJ",
     "synced_at": "2026-08-30T19:59:17.502Z",
     "stats": { "yds": 1780, "td": 17, "raw": { "...": "whatever nflverse's row actually had" } },
     "rank": 2
@@ -120,8 +121,12 @@ rank when we have it, Sleeper's popularity-based ordering as the fallback
 for anyone FantasyPros doesn't cover. Everything downstream should read
 `rank`, not `ecr_rank`/`search_rank` directly.
 
-`bye_week` is `null` until that player's team has been matched against a
-synced schedule — see `src/sync/index.js#computeByeWeeks`.
+`bye_week` and `schedule_summary` are both `null` until that player's team
+has been matched against a synced schedule — see
+`src/sync/index.js#computeByeWeeks` / `#computeTeamSchedules`.
+`schedule_summary` is the same `"Week N vs/@ OPP, ..."` string
+`SEED_PLAYERS` already uses, so the frontend drops it straight into the
+player modal's schedule panel.
 
 ### `POST /api/sync/players`
 

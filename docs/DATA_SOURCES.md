@@ -16,7 +16,7 @@ Analyst insights served from `backend/` (Express + SQLite), seeded with
 hand-picked placeholder quotes. See `backend/README.md`. The Analyst Feed tab
 already talks to this over `GET /api/insights`.
 
-## Phase 2 — real rankings, ADP, stats, injuries & bye weeks — built
+## Phase 2 — real rankings, ADP, stats, injuries, bye weeks & schedules — built
 
 Sleeper, nflverse, and FantasyPros are all implemented — `backend/src/sync/`,
 a `players` table, `GET /api/players`, `POST /api/sync/players`, and a
@@ -29,7 +29,8 @@ today:
   takes precedence over the hardcoded `SIGNAL_TAGS` seed data)
 - Season stats from nflverse's `stats_player` release, matched to Sleeper
   players by normalized name, feeding the player-detail modal
-- Bye weeks, derived from nflverse's full season schedule (see below)
+- Bye weeks and full weekly matchup schedules, both derived from nflverse's
+  full season schedule (see below)
 - Rank is FantasyPros' real expert-consensus rank (ECR, aggregated across
   100+ analysts) when available, falling back to Sleeper's popularity-based
   `search_rank` for anyone FantasyPros doesn't cover
@@ -133,18 +134,28 @@ signal something's wrong (bad key, quota exhausted, response shape
 changed) — check the `fantasyPros` entry in the sync JSON before assuming
 the UI is the problem.
 
-**Bye weeks — built.** `src/sync/nflverse.js#fetchSchedules` +
-`src/sync/index.js#computeByeWeeks` derive each team's bye from the full
-season schedule (the one week a team appears in no game) and write it to
-`players.bye_week`, same untested-against-live-network caveat as everything
-else in this phase. `computeByeWeeks()` itself is a pure function and *was*
-unit-tested directly with synthetic schedule rows — the deriving logic is
-verified, just not the real CSV feeding it.
+**Bye weeks and full weekly matchups — both built.**
+`src/sync/nflverse.js#fetchSchedules` feeds two pure, independently
+unit-tested functions in `src/sync/index.js`:
 
-**Still not synced:** full weekly matchups (the player modal's "2026
-Schedule" panel) — nflverse has this too, just not wired up. New players
-added by sync get a placeholder string there until that's built; existing
-seed players keep their hardcoded schedule text.
+- `computeByeWeeks()` — the one week a team appears in no game
+- `computeTeamSchedules()` — each team's first 5 games, formatted as
+  `"Week 1 vs KC, Week 2 @DAL, ..."` — the exact string shape
+  `SEED_PLAYERS` already used for `schedule2026`, so a synced value drops
+  into the player modal's "2026 Schedule" panel with zero format
+  translation needed
+
+Both write onto `players` (`bye_week`, `schedule_summary`) in one pass over
+the same schedule fetch — `syncNflverseSchedules()` doesn't fetch twice.
+Same untested-against-live-network caveat as the rest of this phase:
+`computeByeWeeks()` and `computeTeamSchedules()` were both unit-tested
+directly against synthetic schedule rows (regular-season filter, season
+filter, gap/matchup logic, POST-season and wrong-season rows correctly
+excluded) — the deriving logic is verified, the real CSV feeding it isn't.
+
+This closes out Phase 2 — every "still not synced" item from earlier in
+this doc is now built. What's left below (Phase 3) needs your input to
+start.
 
 ## Phase 3 — real podcast ingestion ("week to week" insights)
 
