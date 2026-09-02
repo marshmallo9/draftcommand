@@ -1,74 +1,86 @@
 const { parse } = require('csv-parse/sync');
 
-// nflverse publishes data as CSV/parquet assets attached to GitHub releases
-// (one release "tag" per dataset, re-uploaded as the data updates) rather
-// than a versioned API — see https://github.com/nflverse/nflverse-data.
-// Exact asset filenames shift over time (e.g. a season suffix gets added or
-// dropped), so instead of hardcoding a download URL, we ask the GitHub
-// Releases API what's actually attached to the tag right now and pick the
-// most plausible CSV from that list. That's slower than a hardcoded URL but
-// doesn't silently 404 when nflverse renames a file.
-const RELEASES_API = 'https://api.github.com/repos/nflverse/nflverse-data/releases/tags';
+// Direct URL construction, matching nflreadr's own source exactly (verified
+// against https://github.com/nflverse/nflreadr — R/load_stats.R,
+// R/load_injuries.R, R/load_schedules.R) rather than discovering asset
+// names through the GitHub Releases API. Two reasons this is the right
+// call, not just a workaround:
+//   1. It's what the canonical R client actually does — there's no
+//      "discover the real filename" step to get wrong, because nflreadr
+//      itself hardcodes these templates.
+//   2. It never touches api.github.com, which several hosting/network
+//      policies (including this project's own dev sandbox) block more
+//      aggressively than plain github.com/raw.githubusercontent.com asset
+//      downloads.
+// "_reg_" = regular-season totals (one row per player) — what the app's
+// "season stats" panel actually wants. The "_week_" variant nflreadr also
+// offers is one row per player *per week*; fetching that here would mean
+// each subsequent week's row silently overwrites the last as this file
+// gets processed, leaving season_stats_json holding one arbitrary week's
+// box score instead of a season total. Caught this by inspecting real
+// data, not by reasoning about the file — worth remembering if this ever
+// needs revisiting.
+const STATS_URL = (season) =>
+  `https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_reg_${season}.csv`;
+const INJURIES_URL = (season) =>
+  `https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_${season}.csv`;
+// The nflverse-maintained player ID crosswalk — one row per player,
+// "single source of truth" per its own docs (name, position, latest_team,
+// status, gsis_id, draft info). Used as a fallback player-identity source
+// when Sleeper (the primary — richer live status, but occasionally blocked
+// by stricter network policies) can't be reached, so the pool doesn't stay
+// empty just because one source is unreachable.
+const PLAYERS_URL = 'https://github.com/nflverse/nflverse-data/releases/download/players/players.csv';
+// Schedules are NOT an nflverse-data release at all — nflreadr pulls a
+// single all-seasons file from a sibling repo, nflverse/nfldata. Season
+// filtering happens client-side (see sync/index.js), same as nflreadr does.
+const SCHEDULES_URL = 'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv';
 
-async function listReleaseAssets(tag) {
-  const res = await fetch(`${RELEASES_API}/${tag}`, {
-    headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'draftcommand-sync' },
-  });
-  if (!res.ok) {
-    throw new Error(`GitHub releases API responded ${res.status} for tag "${tag}" — nflverse may have renamed or removed it`);
-  }
-  const release = await res.json();
-  return (release.assets || []).map(a => ({ name: a.name, url: a.browser_download_url }));
-}
-
-// Picks the asset most likely to be "this season's full CSV": prefers a
-// .csv (not .parquet/.rds/.qs) containing the current season year, falls
-// back to the newest-looking .csv, then to the first .csv, then null.
-function pickCsvAsset(assets, season) {
-  const csvs = assets.filter(a => a.name.toLowerCase().endsWith('.csv'));
-  if (!csvs.length) return null;
-  const withSeason = csvs.find(a => a.name.includes(String(season)));
-  if (withSeason) return withSeason;
-  const aggregate = csvs.find(a => !/\d{4}/.test(a.name)); // e.g. "player_stats.csv" with no year
-  if (aggregate) return aggregate;
-  return csvs.sort((a, b) => b.name.localeCompare(a.name))[0]; // best-effort "latest"
-}
-
-async function fetchCsvRows(url) {
+async function fetchCsv(url) {
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Failed to download ${url}: ${res.status} ${res.statusText}`);
+    const err = new Error(`Failed to download ${url}: ${res.status} ${res.statusText}`);
+    err.status = res.status;
+    throw err;
   }
   const text = await res.text();
   return parse(text, { columns: true, skip_empty_lines: true });
 }
 
-// Returns raw rows, columns as nflverse ships them — we deliberately don't
-// assume a fixed schema (see schema.sql's comment on season_stats_json).
+// Early in a season (before the first week's stats/injury reports have been
+// published — which, per nflreadr's own most_recent_season() boundary, can
+// be true even after Labor Day if games genuinely haven't been played yet),
+// the current season's file 404s. Fall back one season rather than erroring
+// outright, same as asking for "the most recent stats we actually have."
+async function fetchWithSeasonFallback(urlFor, season) {
+  try {
+    return { season, rows: await fetchCsv(urlFor(season)) };
+  } catch (err) {
+    if (err.status !== 404) throw err;
+    const fallbackSeason = season - 1;
+    return { season: fallbackSeason, rows: await fetchCsv(urlFor(fallbackSeason)) };
+  }
+}
+
 async function fetchPlayerStats(season) {
-  const assets = await listReleaseAssets('stats_player');
-  const asset = pickCsvAsset(assets, season);
-  if (!asset) throw new Error('No CSV asset found on the nflverse "stats_player" release');
-  return fetchCsvRows(asset.url);
+  return fetchWithSeasonFallback(STATS_URL, season);
 }
 
 async function fetchInjuries(season) {
-  const assets = await listReleaseAssets('injuries');
-  const asset = pickCsvAsset(assets, season);
-  if (!asset) throw new Error('No CSV asset found on the nflverse "injuries" release');
-  return fetchCsvRows(asset.url);
+  return fetchWithSeasonFallback(INJURIES_URL, season);
 }
 
-// The full season schedule (all weeks, both played and future) — this is
-// what bye weeks get derived from. nflverse's "schedules" release typically
-// ships one CSV covering many seasons at once rather than per-season files,
-// so pickCsvAsset's season-suffix matching often falls through to its
-// no-year-in-filename fallback here, which is expected.
-async function fetchSchedules(season) {
-  const assets = await listReleaseAssets('schedules');
-  const asset = pickCsvAsset(assets, season);
-  if (!asset) throw new Error('No CSV asset found on the nflverse "schedules" release');
-  return fetchCsvRows(asset.url);
+// All seasons in one file — nflreadr does the same, filtering to specific
+// seasons is left to the caller (see computeByeWeeks/computeTeamSchedules).
+async function fetchSchedules() {
+  return fetchCsv(SCHEDULES_URL);
 }
 
-module.exports = { listReleaseAssets, pickCsvAsset, fetchPlayerStats, fetchInjuries, fetchSchedules };
+async function fetchPlayers() {
+  return fetchCsv(PLAYERS_URL);
+}
+
+module.exports = {
+  fetchPlayerStats, fetchInjuries, fetchSchedules, fetchPlayers,
+  STATS_URL, INJURIES_URL, SCHEDULES_URL, PLAYERS_URL,
+};

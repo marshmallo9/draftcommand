@@ -24,24 +24,85 @@ a `players` table, `GET /api/players`, `POST /api/sync/players`, and a
 `state.players` the same way pasted rows already merge. What that gets you
 today:
 
-- Real player pool, position, team, and live injury status from Sleeper —
-  flows into the AI Insights risk list automatically (a live signal now
-  takes precedence over the hardcoded `SIGNAL_TAGS` seed data)
-- Season stats from nflverse's `stats_player` release, matched to Sleeper
-  players by normalized name, feeding the player-detail modal
-- Bye weeks and full weekly matchup schedules, both derived from nflverse's
-  full season schedule (see below)
+- Real player pool, position, team from Sleeper (primary) or, when Sleeper
+  can't be reached, from nflverse's own player crosswalk instead (see
+  below) — either way live injury status flows into the AI Insights risk
+  list automatically, taking precedence over the hardcoded `SIGNAL_TAGS`
+  seed data
+- Season stats from nflverse, matched by normalized name, feeding the
+  player-detail modal
+- Bye weeks and full weekly matchup schedules, both derived from the real
+  season schedule (see below)
 - Rank is FantasyPros' real expert-consensus rank (ECR, aggregated across
   100+ analysts) when available, falling back to Sleeper's popularity-based
   `search_rank` for anyone FantasyPros doesn't cover
 
-**Important caveat: unverified against live network.** This was built and
-committed from a sandboxed session whose network policy blocks outbound
-calls to `api.sleeper.app` and `api.github.com` (see PR discussion) — so the
-DB schema, upsert logic, API responses, and frontend merge were all tested
-end-to-end with synthetic data standing in for a real sync, but the actual
-HTTP calls to Sleeper and nflverse have not been exercised. Before trusting
-this:
+### nflverse sources — verified against real, live data
+
+Unlike the rest of this project, the nflverse portion of Phase 2 (stats,
+injuries, schedules, and the player-crosswalk fallback below) is **not**
+resting on a "should work, couldn't test it" caveat — it was actually run
+against the live internet mid-session and produced real output: 4,780 real
+active players, real 2025 season stat lines (e.g. Chase Brown: 1,019
+rushing yards, 6 rushing TDs — matches his real season), real bye weeks and
+full 2026 schedules for all 32 teams, all flowing correctly through to the
+Explorer table and player modal in a headless-browser check. `Sleeper` and
+`FantasyPros` remain genuinely unverified — see their own sections below —
+this verification is nflverse-only.
+
+Getting there involved cloning `nflverse/nflreadr`'s actual R source (the
+canonical client) to read its real download-URL templates, rather than
+continuing to guess — and that surfaced two real bugs that would otherwise
+have shipped:
+
+1. **`fetchPlayerStats` was pointed at the wrong file.** nflreadr's
+   `stats_player` release has both a `_week_` variant (one row per player
+   *per week*) and a `_reg_` variant (one row per player, season totals).
+   The original code fetched `_week_`, and since the sync loop just
+   `UPDATE`s the same row for every match it finds, `season_stats_json`
+   ended up holding whichever week happened to be processed last — not a
+   season total. Fixed by switching to `_reg_`, which is what the app's
+   "season stats" panel actually means.
+2. **Injury status was falling back to practice-participation noise.** The
+   injuries file's `report_status` (Out/Questionable/Doubtful) is the real
+   game-status designation; `practice_status` ("Full Participation in
+   Practice") is logged for most players most weeks even when perfectly
+   healthy. The original fallback (`report_status || practice_status`)
+   meant routinely-healthy players could get tagged as an injury "risk".
+   Fixed to use `report_status` only, and to take each player's *latest*
+   week rather than whichever the weekly file happened to list first.
+
+Also corrected: **schedules were never an nflverse-data release at all.**
+nflreadr pulls them from a sibling repo, `nflverse/nfldata`, as a single
+plain CSV (`raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv`)
+covering every season — not a GitHub Release asset. The original
+`fetchSchedules()` guessed at a `"schedules"` release tag on
+`nflverse-data` that doesn't exist. `src/sync/nflverse.js` now points at
+the real source.
+
+One practical side effect worth knowing: `api.github.com` (the Releases
+*API*, used to discover asset names) is blocked by stricter network
+policies more often than the plain asset-download host
+(`github.com/.../releases/download/...`) or `raw.githubusercontent.com`.
+Since nflreadr never uses the Releases API at all — it constructs
+download URLs directly from a known, stable naming convention — neither
+does this code anymore. That's not a workaround, it's just correct: it's
+what the canonical client actually does, and it happens to also be more
+portable across restrictive network policies.
+
+**New: `nflversePlayersFallback`.** When Sleeper can't be reached, the pool
+would otherwise stay empty — everything else (stats, injuries, schedules)
+matches against player rows that were never created. `src/sync/nflverse.js
+#fetchPlayers()` pulls nflverse's own player-ID crosswalk
+(`.../releases/download/players/players.csv` — "the single source of
+truth" per its own docs) as a real, current fallback identity source:
+active players (`status === 'ACT'`) at fantasy-relevant positions, with
+real position/team. It never overwrites a Sleeper-sourced row — only fills
+in when Sleeper genuinely didn't provide one — and only runs at all when
+`syncSleeper()` throws. A run against live data in this project's own
+dev sandbox (where Sleeper is blocked) populated 4,780 real players this
+way, of which 4,713 ended up with a resolved bye week/schedule and ~470–500
+with matched season stats/injury data.
 
 ```bash
 cd backend
@@ -51,12 +112,12 @@ npm run sync            # runs scripts/sync-players.js once, prints a JSON summa
 
 A clean run ends with `OK — N players in the database.` A source that fails
 prints its own error under its own key in the JSON (`sleeper`,
-`nflverseStats`, `nflverseInjuries`, `nflverseSchedules`, `fantasyPros`) —
-most likely cause for an nflverse source is a renamed release asset
-(`pickCsvAsset()` in `src/sync/nflverse.js` guesses at naming; adjust its
-heuristic once you see what's actually attached to the relevant tag today),
-for Sleeper a transient rate limit, and for FantasyPros either the key or
-its quota — see the FantasyPros section below before assuming it's broken.
+`nflversePlayersFallback`, `nflverseStats`, `nflverseInjuries`,
+`nflverseSchedules`, `fantasyPros`) — for Sleeper/FantasyPros, that's most
+likely their host being blocked by your network policy (see their sections
+below) or a real key/quota problem; the nflverse sources should now
+reliably succeed anywhere with normal internet access, since they're
+verified against the exact real files.
 
 **FantasyPros ECR — built.** `src/sync/fantasypros.js` calls
 `GET /nfl/{season}/consensus-rankings` (`x-api-key` header, `position=ALL`
@@ -88,11 +149,15 @@ source actually supplied it.
 `x-api-key` header), the missing-key error, and the entire cooldown state
 machine (skip when fresh, bypass with `force`, a failed attempt not
 starting the clock) were all exercised directly — the last of those against
-a real timestamp, not a mock. What's *not* verified is the actual response
-shape from a real 200 — same caveat as Sleeper/nflverse, run `npm run sync`
-for real before trusting the field names in `syncFantasyPros()`
-(`player_name`, `rank_ecr`, `tier`) against what your key's calls actually
-return.
+a real timestamp, not a mock; the request itself was confirmed to actually
+attempt with a placeholder key, hitting a network block rather than
+erroring before that point. What's *not* verified — and, unlike nflverse
+above, still isn't — is the actual response shape from a real 200:
+`api.fantasypros.com` is blocked by the same network policy that blocks
+Sleeper, so there was no live host to test this against even after finding
+one for nflverse. Run `npm run sync` for real before trusting the field
+names in `syncFantasyPros()` (`player_name`, `rank_ecr`, `tier`) against
+what your key's calls actually return.
 
 **Still open:** ESPN's undocumented fantasy API
 ([community docs](https://github.com/pseudo-r/Public-ESPN-API)) as a
@@ -147,11 +212,13 @@ unit-tested functions in `src/sync/index.js`:
 
 Both write onto `players` (`bye_week`, `schedule_summary`) in one pass over
 the same schedule fetch — `syncNflverseSchedules()` doesn't fetch twice.
-Same untested-against-live-network caveat as the rest of this phase:
-`computeByeWeeks()` and `computeTeamSchedules()` were both unit-tested
+`computeByeWeeks()` and `computeTeamSchedules()` were first unit-tested
 directly against synthetic schedule rows (regular-season filter, season
 filter, gap/matchup logic, POST-season and wrong-season rows correctly
-excluded) — the deriving logic is verified, the real CSV feeding it isn't.
+excluded), then re-verified against the real 2026 schedule — see
+"nflverse sources — verified against real, live data" above. All 32 teams
+resolved a real bye week and a real 5-week schedule; e.g. Cincinnati's real
+2026 bye is week 6, matching what a real 2026 schedule says.
 
 This closes out Phase 2 — every "still not synced" item from earlier in
 this doc is now built. What's left below (Phase 3) needs your input to

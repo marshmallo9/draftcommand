@@ -1,8 +1,10 @@
 const { run, get, all } = require('../db');
 const { fetchSleeperPlayers } = require('./sleeper');
-const { fetchPlayerStats, fetchInjuries, fetchSchedules } = require('./nflverse');
+const { fetchPlayerStats, fetchInjuries, fetchSchedules, fetchPlayers } = require('./nflverse');
 const { fetchConsensusRankings } = require('./fantasypros');
 const { normalizeName } = require('./normalize');
+
+const FANTASY_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K']);
 
 const CURRENT_SEASON = new Date().getFullYear();
 
@@ -55,8 +57,45 @@ async function syncSleeper() {
   return players.length;
 }
 
+// Only invoked when Sleeper itself is unreachable (see runSync) — Sleeper
+// stays the primary player-identity source since it has richer live status
+// (injury_status, roster status), but if it can't be reached, the nflverse
+// player crosswalk is a genuine, real, current alternative rather than
+// leaving the pool empty until Sleeper comes back.
+async function syncNflversePlayersFallback() {
+  const rows = await fetchPlayers();
+  const now = new Date().toISOString();
+  let count = 0;
+  for (const row of rows) {
+    if (row.status !== 'ACT' || !FANTASY_POSITIONS.has(row.position) || !row.display_name) continue;
+    const norm = normalizeName(row.display_name);
+    const existing = await get('SELECT id, sleeper_id FROM players WHERE normalized_name = ?', [norm]);
+    if (existing) {
+      // Never overwrite a Sleeper-sourced row's identity with this fallback
+      // — just backfill gsis_id for a future, more precise stats/injury
+      // join than the name-matching the rest of this file relies on.
+      if (!existing.sleeper_id) {
+        await run('UPDATE players SET pos = ?, team = ?, gsis_id = ?, synced_at = ? WHERE id = ?', [
+          row.position, row.latest_team || null, row.gsis_id || null, now, existing.id,
+        ]);
+      }
+    } else {
+      await run(
+        `INSERT INTO players (gsis_id, name, normalized_name, pos, team, status, synced_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [row.gsis_id || null, row.display_name, norm, row.position, row.latest_team || null, 'Active', now]
+      );
+    }
+    count++;
+  }
+  return count;
+}
+
 async function syncNflversePlayerStats() {
-  const rows = await fetchPlayerStats(CURRENT_SEASON);
+  // fetchPlayerStats falls back a season if the current one hasn't been
+  // published yet (e.g. before Week 1 stats exist) — report which season
+  // actually got used, since "0 matched" alone doesn't say why.
+  const { season, rows } = await fetchPlayerStats(CURRENT_SEASON);
   let matched = 0;
   for (const row of rows) {
     const rawName = row.player_display_name || row.player_name || row.full_name || row.name;
@@ -67,17 +106,33 @@ async function syncNflversePlayerStats() {
     await run('UPDATE players SET season_stats_json = ? WHERE id = ?', [JSON.stringify(row), existing.id]);
     matched++;
   }
-  return { total: rows.length, matched };
+  return { season, total: rows.length, matched };
 }
 
 async function syncNflverseInjuries() {
-  const rows = await fetchInjuries(CURRENT_SEASON);
-  let matched = 0;
+  const { season, rows } = await fetchInjuries(CURRENT_SEASON);
+
+  // One row per player per week — keep only each player's most recent
+  // week so this reflects their latest status, not whichever week happens
+  // to appear first in the file.
+  const latestByPlayer = new Map();
   for (const row of rows) {
     const rawName = row.full_name || row.player_name || row.gsis_name;
     if (!rawName) continue;
-    const norm = normalizeName(rawName);
-    const status = row.report_status || row.practice_status;
+    const week = Number(row.week) || 0;
+    const key = normalizeName(rawName);
+    const prev = latestByPlayer.get(key);
+    if (!prev || week > prev.week) latestByPlayer.set(key, { week, row });
+  }
+
+  let matched = 0;
+  for (const [norm, { row }] of latestByPlayer) {
+    // report_status ("Out"/"Questionable"/"Doubtful") is the real
+    // game-status designation. practice_status ("Full Participation in
+    // Practice") is routine and logged for most players most weeks even
+    // when perfectly healthy — using it as a fallback (an earlier version
+    // of this function did) would mislabel most of the league as "risk".
+    const status = row.report_status;
     if (!status) continue;
     // Sleeper's own injury_status is a live, current signal — only fill in
     // from the (weekly, point-in-time) nflverse injury report when Sleeper
@@ -88,7 +143,7 @@ async function syncNflverseInjuries() {
     );
     if (res.changes > 0) matched++;
   }
-  return { total: rows.length, matched };
+  return { season, total: rows.length, matched };
 }
 
 // Derives each team's bye week from the full schedule: the one week in the
@@ -151,7 +206,7 @@ function computeTeamSchedules(scheduleRows, weeksToShow = 5) {
 }
 
 async function syncNflverseSchedules() {
-  const rows = await fetchSchedules(CURRENT_SEASON);
+  const rows = await fetchSchedules();
   const byeByTeam = computeByeWeeks(rows);
   const summaryByTeam = computeTeamSchedules(rows);
   const teams = new Set([...Object.keys(byeByTeam), ...Object.keys(summaryByTeam)]);
@@ -214,18 +269,24 @@ async function runSync(opts = {}) {
     result.sleeper = { ok: true, count };
   } catch (err) {
     result.sleeper = { ok: false, error: err.message };
+    try {
+      const count = await syncNflversePlayersFallback();
+      result.nflversePlayersFallback = { ok: true, count };
+    } catch (err2) {
+      result.nflversePlayersFallback = { ok: false, error: err2.message };
+    }
   }
 
   try {
-    const { total, matched } = await syncNflversePlayerStats();
-    result.nflverseStats = { ok: true, total, matched };
+    const { season, total, matched } = await syncNflversePlayerStats();
+    result.nflverseStats = { ok: true, season, total, matched };
   } catch (err) {
     result.nflverseStats = { ok: false, error: err.message };
   }
 
   try {
-    const { total, matched } = await syncNflverseInjuries();
-    result.nflverseInjuries = { ok: true, total, matched };
+    const { season, total, matched } = await syncNflverseInjuries();
+    result.nflverseInjuries = { ok: true, season, total, matched };
   } catch (err) {
     result.nflverseInjuries = { ok: false, error: err.message };
   }

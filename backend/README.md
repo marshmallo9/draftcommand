@@ -6,11 +6,19 @@ Sleeper, nflverse, and FantasyPros.
 
 Insights are still hand-curated placeholder quotes (light build — no audio
 transcription yet, that's Phase 3). Player sync is real and live: Sleeper
-for the player pool/position/team/injury status, nflverse for season stats
-and bye weeks, FantasyPros for a real expert-consensus rank. All shaped so
-what's still open (real podcast transcription) drops in later without
-changing the frontend contract — see
+for the player pool/position/team/injury status (falling back to nflverse's
+own player crosswalk if Sleeper can't be reached), nflverse for season
+stats, injuries, bye weeks and full weekly schedules, FantasyPros for a
+real expert-consensus rank. All shaped so what's still open (real podcast
+transcription) drops in later without changing the frontend contract — see
 [`docs/DATA_SOURCES.md`](../docs/DATA_SOURCES.md).
+
+The nflverse sources have actually been run against live data and produced
+real output (real season stats, real 2026 bye weeks/schedules for all 32
+teams) — see `docs/DATA_SOURCES.md` for specifics and two real bugs that
+verification caught. Sleeper and FantasyPros have not: their hosts are
+blocked by this project's own dev network policy, so only nflverse could
+be exercised for real so far.
 
 **FantasyPros requires an API key** (`FANTASYPROS_API_KEY` in `.env` — see
 `.env.example`). It's a free key for personal/non-commercial use with a real
@@ -137,14 +145,21 @@ per-source result, even if every source failed:
 
 ```json
 {
-  "sleeper": { "ok": true, "count": 2841 },
-  "nflverseStats": { "ok": true, "total": 4102, "matched": 2390 },
-  "nflverseInjuries": { "ok": true, "total": 88, "matched": 12 },
-  "nflverseSchedules": { "ok": true, "teamsResolved": 32, "playersUpdated": 2841 },
+  "sleeper": { "ok": false, "error": "..." },
+  "nflversePlayersFallback": { "ok": true, "count": 4780 },
+  "nflverseStats": { "ok": true, "season": 2025, "total": 2020, "matched": 470 },
+  "nflverseInjuries": { "ok": true, "season": 2025, "total": 6068, "matched": 118 },
+  "nflverseSchedules": { "ok": true, "teamsResolved": 32, "playersUpdated": 4713 },
   "fantasyPros": { "ok": true, "total": 400, "matched": 380 },
-  "playersInDb": 2841
+  "playersInDb": 4713
 }
 ```
+(a real run from this project's dev sandbox, where Sleeper is blocked —
+`nflversePlayersFallback` only appears when `sleeper` fails; on a host
+where Sleeper works, expect `sleeper: { ok: true, count: N }` and no
+`nflversePlayersFallback` entry at all). `nflverseStats`/`nflverseInjuries`
+report which `season` actually got used — they fall back a year if the
+current season's file isn't published yet (e.g. before Week 1 stats exist).
 
 If the FantasyPros cooldown hasn't elapsed, that entry looks like
 `{ "ok": true, "skipped": true, "reason": "..." }` instead — still `ok`,
@@ -155,15 +170,23 @@ No auth on this MVP endpoint. Either protect it before it's public-facing,
 or only ever call it from a scheduled job (`npm run sync` /
 `scripts/sync-players.js`) rather than exposing the route.
 
-**This has not been exercised against the live Sleeper/nflverse/FantasyPros
-APIs** — it was built in a sandboxed session whose network policy blocks
-those hosts. The DB layer, upsert logic, API responses, and (for
-FantasyPros specifically) the entire cooldown state machine were verified
-end-to-end with synthetic data and real timestamps standing in for a real
-sync; the actual HTTP calls haven't been. Run `npm run sync` once wherever
-this actually has internet access before trusting it — see
-`docs/DATA_SOURCES.md` for what a clean run looks like and how to debug a
-source that fails.
+**Verification status differs by source.** The nflverse sources
+(`nflversePlayersFallback`, `nflverseStats`, `nflverseInjuries`,
+`nflverseSchedules`) have been run against the real internet mid-project
+and produced real output — real season stats, real 2026 bye weeks and
+schedules for all 32 teams — not just tested with synthetic data standing
+in for a sync. That verification pass caught two real bugs (wrong file
+granularity for season stats; injury status falling back to
+practice-participation noise instead of a real game-status designation) —
+see `docs/DATA_SOURCES.md` for both. **Sleeper and FantasyPros have not**
+been exercised against their live APIs: both hosts are blocked by this
+project's own dev network policy. The DB layer, upsert logic, API
+responses, and (for FantasyPros) its cooldown state machine were verified
+end-to-end with synthetic data and real timestamps standing in for those
+two specifically. Run `npm run sync` once wherever this actually has
+unrestricted internet access before fully trusting Sleeper/FantasyPros —
+see `docs/DATA_SOURCES.md` for what a clean run looks like and how to
+debug a source that fails.
 
 ## Frontend integration
 

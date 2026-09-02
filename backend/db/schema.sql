@@ -27,7 +27,10 @@ CREATE INDEX IF NOT EXISTS idx_insights_position ON insights(position);
 -- else in this schema depends on it being populated.
 CREATE TABLE IF NOT EXISTS players (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  sleeper_id TEXT UNIQUE,       -- Sleeper's player_id; our stable join key
+  sleeper_id TEXT UNIQUE,       -- Sleeper's player_id; our stable join key when Sleeper is reachable
+  gsis_id TEXT,                 -- nflverse's player_id, set when a player came from (or was
+                                 -- matched against) the nflverse players crosswalk instead —
+                                 -- see src/sync/index.js#syncNflversePlayersFallback
   name TEXT NOT NULL,
   normalized_name TEXT NOT NULL, -- lowercased, punctuation/suffix-stripped, for best-effort joins across sources
   pos TEXT,
